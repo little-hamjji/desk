@@ -106,6 +106,9 @@ select.in{padding-right:24px}
 .muted{color:var(--fg2)} .faint{color:var(--fg3)}
 .tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--fg2);white-space:nowrap}
 .tag i{width:7px;height:7px;border-radius:50%}
+/* 남은 일: 프로젝트 점이 네온처럼 깜박 */
+.task:not(.done) .meta .tag i{animation:neon 2.4s ease-in-out infinite;box-shadow:0 0 4px 1px var(--c),0 0 10px 2px color-mix(in srgb,var(--c) 55%,transparent)}
+@keyframes neon{0%,100%{opacity:1;filter:brightness(1.35)}45%{opacity:1}55%{opacity:.25;box-shadow:none;filter:none}62%{opacity:1;filter:brightness(1.35)}}
 .pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--fill);color:var(--fg2);white-space:nowrap}
 .pill.red{background:rgba(255,69,58,.18);color:#ff6961}
 .pill.orange{background:rgba(255,159,10,.18);color:var(--orange)}
@@ -717,7 +720,7 @@ function ring(pct,size,color,stroke){const r=(size-stroke)/2,c=2*Math.PI*r;
 const isDone=t=>t.s==="완료";
 const isDec=t=>/^\[결정\]/.test(t.t||"");
 const prioEl=r=>r==="상"?h("span",{class:"prio p3",title:"우선순위 상"},"!!!"):r==="중"?h("span",{class:"prio",title:"우선순위 중"},"!!"):null;
-const ptag=p=>p?h("span",{class:"tag"},h("i",{style:`background:${PCOL[p]||"var(--gray)"}`}),p):null;
+const ptag=p=>p?h("span",{class:"tag"},h("i",{style:`--c:${PCOL[p]||"var(--gray)"};background:var(--c)`}),p):null;
 
 function taskRow(t,o={}){
   const today=TODAY(),dd=dOf(t.d),late=!isDone(t)&&dd&&dd<today;
