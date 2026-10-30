@@ -387,6 +387,17 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .pfw.play .f-reveal{animation:sweep 1.9s cubic-bezier(.45,.05,.2,1) both .3s;transform-box:fill-box;transform-origin:left}
 .pfw.play .f-line{stroke-dasharray:1;animation:dash 2s cubic-bezier(.45,.05,.2,1) both .3s}@keyframes dash{from{stroke-dashoffset:1}}
 .pfw.play .f-dot,.pfw.play .f-tot{animation:pfpop .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(.45s + var(--i)*200ms);transform-box:fill-box;transform-origin:center}
+/* 이카운트 결재현황 */
+.appr{display:grid;gap:6px}
+.appr-r{border:.5px solid var(--line);border-radius:10px;background:rgba(0,0,0,.16);padding:8px 10px;display:grid;gap:5px}
+.appr-r.on{border-color:rgba(10,132,255,.5)}
+.appr-h{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;background:none;border:0;padding:0;text-align:left;cursor:pointer;color:inherit}
+.appr-h .tt{font-size:12.8px;line-height:1.45}.appr-h .pill{flex:none}
+.appr-steps{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11.5px;color:var(--fg3)}
+.appr-steps span{padding:1px 7px;border-radius:9px;background:rgba(255,255,255,.05)}
+.appr-steps .ok{color:#7ee2a0;background:rgba(48,209,88,.12)}.appr-steps .now{color:#409cff;background:rgba(10,132,255,.18);font-weight:700}
+.appr-steps i{font-style:normal;opacity:.5}
+.appr-d{display:flex;gap:8px;align-items:center;font-size:12px}
 /* 일별 업무 밀도(월별) */
 .hm{display:grid;gap:12px}
 .hm-top{display:flex;align-items:center;gap:10px}
@@ -1662,33 +1673,58 @@ function hkFill(){(async()=>{
   say("채웠습니다 ✓ 노란 칸을 확인해 주세요."+(d.bizno?"":"\n거래처 코드는 이전 문서 값 그대로입니다. 꼭 바꿔 주세요.")+(more?"\n⚠ 아래 줄에 이전 문서 금액이 "+more+"줄 더 있습니다. 지워 주세요.":"")+"\n첨부할 파일: "+(d.file||"(없음)")+"\n확인 후 「임시저장」은 대표님이 눌러 주세요.");
 })()}
 function hkStatus(){(async()=>{
-  const say=m=>{let b=document.getElementById("hk-say");if(!b){b=document.createElement("div");b.id="hk-say";document.body.append(b)}
+  const ME="이채림",MAX=20,sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const say=(m,keep)=>{let b=document.getElementById("hk-say");if(!b){b=document.createElement("div");b.id="hk-say";document.body.append(b)}
     b.style.cssText="position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:2147483647;background:#1c1c1e;color:#fff;padding:12px 18px;border-radius:12px;font:600 14px/1.6 sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:pre-line";
-    b.textContent="🐹 햄꾼 · "+m;clearTimeout(window.__hkT);window.__hkT=setTimeout(()=>b.remove(),8000)};
-  const rows=[...document.querySelectorAll("tbody tr")].filter(tr=>tr.offsetParent&&/\d{4}\/\d{2}\/\d{2}-\d+/.test(tr.innerText));
-  if(!rows.length){say("결재 목록이 보이지 않습니다. 첫 화면이나 「내결재관리」에서 눌러 주세요.");return}
-  const out=rows.map(tr=>{const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
+    b.textContent="🐹 햄꾼 · "+m;clearTimeout(window.__hkT);if(!keep)window.__hkT=setTimeout(()=>b.remove(),9000)};
+  const all=[...document.querySelectorAll("tbody tr")].filter(tr=>tr.offsetParent&&/\d{4}\/\d{2}\/\d{2}-\d+/.test(tr.innerText));
+  if(!all.length){say("결재 목록이 보이지 않습니다. 「내결재관리 → 진행중」에서 눌러 주세요.");return}
+  const mine=all.filter(tr=>[...tr.querySelectorAll("td")].some(td=>td.innerText.trim()===ME));
+  const rows=(mine.length?mine:all).slice(0,MAX),out=[];
+  for(let i=0;i<rows.length;i++){const tr=rows[i];say(`결재 단계 확인 중… ${i+1}/${rows.length}\n(문서를 잠깐씩 열었다 닫습니다. 기다려 주세요)`,1);
+    const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
     const big=[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);big.querySelectorAll(".label").forEach(x=>x.remove());
-    const title=big.innerText.trim().replace(/\s+/g," ");let st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();if(st==="결재")st="완료";return {no,title,st}});
-  const tj=Array.prototype.toJSON;delete Array.prototype.toJSON;const txt=JSON.stringify({hamkkun:"appr",v:1,at:new Date().toISOString(),rows:out});if(tj)Array.prototype.toJSON=tj;
-  try{await navigator.clipboard.writeText(txt);say(out.length+"건 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요.")}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
+    const title=big.innerText.trim().replace(/\s+/g," "),st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();
+    const steps=[],a=[...tr.querySelectorAll("a")].find(x=>x.innerText.trim()==="보기");
+    if(a){a.click();let boxes=[];for(let k=0;k<24&&!boxes.length;k++){await sleep(250);boxes=[...document.querySelectorAll("table")].filter(t=>t.offsetParent&&/^결\s*재/.test(t.innerText.trim())&&t.innerText.length<300)}
+      boxes.forEach(t=>{const trs=[...t.querySelectorAll("tr")];if(trs.length<3)return;const roles=[...trs[0].children].slice(1).map(x=>x.innerText.trim().replace(/\s+/g,""));const ds=[...trs[trs.length-1].children].map(x=>x.innerText.trim());
+        roles.forEach((r,j)=>{const m=(ds[j]||"").match(/\d{4}\/\d{2}\/\d{2}/),d=m?m[0]:"",p=steps[steps.length-1];if(p&&p.r===r){if(!p.d)p.d=d}else steps.push({r,d})})});
+      const open=()=>[...document.querySelectorAll("table")].some(t=>t.offsetParent&&/^결\s*재/.test(t.innerText.trim()));
+      for(let k=0;k<6&&open();k++){const cl=[...document.querySelectorAll("button")].filter(b=>b.offsetParent&&b.innerText.trim()==="닫기");if(cl.length)cl[cl.length-1].click();await sleep(600)}}
+    out.push({no,title,st,steps})}
+  const tj=Array.prototype.toJSON;delete Array.prototype.toJSON;const txt=JSON.stringify({hamkkun:"appr",v:2,at:new Date().toISOString(),rows:out});if(tj)Array.prototype.toJSON=tj;
+  try{await navigator.clipboard.writeText(txt);say(out.length+"건의 결재 단계를 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요.")}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
 })()}
 const bmk=fn=>"javascript:"+encodeURIComponent("("+fn.toString()+")()");
 const apprFix=d=>{if(d&&typeof d.rows==="string"){try{d.rows=JSON.parse(d.rows)}catch(e){d.rows=[]}}if(d&&!Array.isArray(d.rows))d.rows=[];return d};
-S.appr=apprFix(ls.get("desk:appr",null));
+S.appr=apprFix(ls.get("desk:appr",null));S.apprOpen=null;
+// 결재 단계로 지금 상태 판단: 반려 / 결재 완료 / ○○ 대기(3일 넘게 멈추면 확인 필요)
+function apprState(r){
+  if(r.st==="반려")return {t:"반려",c:"red"};
+  const s=r.steps||[];if(!s.length)return {t:r.st||"—",c:""};
+  const wait=s.find(x=>!x.d);if(!wait)return {t:"결재 완료",c:"green"};
+  const last=s.filter(x=>x.d).map(x=>x.d.replace(/\//g,"-")).sort().pop(),days=last?Math.floor((Date.parse(TODAY())-Date.parse(last))/864e5):0;
+  return days>=3?{t:`${wait.r} 대기 ${days}일째`,c:"orange"}:{t:`${wait.r} 대기`,c:"blue"};
+}
 function apprCard(){
-  const A=S.appr,col={"반려":"red","진행중":"blue","기안중":"","완료":"green","결재완료":"green"};
+  const A=S.appr;
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
     try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render()}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
-  return card("이카운트",{icon:"work",count:"지출결의 채우기 · 결재현황"},
-    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"아래 두 버튼을 크롬 ",h("b",null,"즐겨찾기 막대로 끌어다 놓으세요"),"(한 번만). 이카운트 화면에서 그 즐겨찾기를 누르면 동작합니다."),
+  const rows=A&&A.rows?A.rows.slice().sort((a,b)=>{const o={red:0,orange:1,blue:2,"":3,green:4};return o[apprState(a).c]-o[apprState(b).c]}):[];
+  const md=d=>d?+d.slice(5,7)+"/"+ +d.slice(8,10):"";
+  return card("이카운트",{icon:"work",count:A?`결재현황 ${agoTxt(A.at)} 기준`:"지출결의 채우기 · 결재현황"},
+    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"아래 두 버튼을 크롬 ",h("b",null,"즐겨찾기 막대로 끌어다 놓으세요"),"(한 번만). 결재현황은 이카운트 「내결재관리 → 진행중」에서 누르면 내 기안의 결재 단계를 읽어 옵니다."),
     h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
       h("a",{class:"btn go",href:bmk(hkFill),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 채우기"),
-      h("a",{class:"btn pri",href:bmk(hkStatus),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 결재현황")),
-    h("div",{class:"row",style:"gap:8px"},h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기"),A?h("span",{class:"faint",style:"font-size:12px"},agoTxt(A.at)+" 기준"):null),
-    A&&A.rows.length?h("div",{class:"list"},A.rows.slice(0,15).map(r=>h("div",{class:"task"},h("span"),h("div",{class:"body"},h("span",{class:"tt"},r.title),h("div",{class:"meta"},h("span",null,r.no))),
-      r.st?h("span",{class:"pill "+(col[r.st]||"")},r.st):null))):null);
+      h("a",{class:"btn pri",href:bmk(hkStatus),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 결재현황"),
+      h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기")),
+    rows.length?h("div",{class:"appr"},rows.slice(0,20).map(r=>{const s=apprState(r),open=S.apprOpen===r.no;
+      return h("div",{class:"appr-r"+(open?" on":"")},
+        h("button",{class:"appr-h",onclick:()=>{S.apprOpen=open?null:r.no;render()}},h("span",{class:"tt"},r.title),h("span",{class:"pill "+s.c},s.t)),
+        r.steps&&r.steps.length?h("div",{class:"appr-steps"},r.steps.map((x,i)=>[i?h("i",null,"→"):null,h("span",{class:x.d?"ok":(r.steps.findIndex(y=>!y.d)===i?"now":"")},x.r,x.d?" ✓"+md(x.d):r.steps.findIndex(y=>!y.d)===i?" ⏳":"")])):null,
+        open?h("div",{class:"appr-d"},h("span",{class:"faint"},"기안번호 "+r.no),h("button",{class:"btn ghost sm",onclick:()=>pfCopy(r.no,"기안번호를 복사했습니다 · 이카운트 내결재관리 검색칸에 붙여넣으세요")},"번호 복사")):null)})):
+      h("div",{class:"faint",style:"font-size:12px"},"아직 불러온 결재현황이 없습니다."));
 }
 function jobSheet(){
   const j=byId(S.data.jobs,S.sel.id);if(!j){S.sel=null;return null}
