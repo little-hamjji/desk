@@ -376,6 +376,12 @@ function linkAttendance(fields) {
 // 편집기에서 ▶ 실행해 보면 연결 상태를 확인할 수 있습니다(로그에 건수 표시)
 function testConnection() {
   const d = ACTIONS.load();
-  Logger.log('할 일 %s건 · 일정 %s건 · 습관 %s개 · 메모 %s건 · 이직 %s건 · 근태 %s건%s',
-    d.tasks.length, d.events.length, d.habits.length, d.memos.length, d.jobs.length, d.att.length, d.calError ? ' · 캘린더 오류: ' + d.calError : '');
+  if (!d.notion) { // 회사 계정·음악 계정(노션 키 없음)
+    Logger.log("계정 %s · 메일 %s건 · 일정 %s건%s%s", d.account, (d.mail || []).length, d.events.length,
+      d.mailError ? " · 메일 오류: " + d.mailError : "", d.calError ? " · 캘린더 오류: " + d.calError : "");
+    return;
+  }
+  Logger.log("할 일 %s건 · 일정 %s건 · 메일 %s건 · 습관 %s개 · 메모 %s건 · 이직 %s건 · 근태 %s건 · 업무일지 %s건 · 브리핑 %s건%s%s",
+    d.tasks.length, d.events.length, (d.mail || []).length, d.habits.length, d.memos.length, d.jobs.length, d.att.length, d.logs.length, d.news.length,
+    d.warn && d.warn.length ? " · 연결 안 된 곳: " + d.warn.join(", ") : "", d.calError ? " · 캘린더 오류: " + d.calError : "");
 }
