@@ -581,7 +581,7 @@ const VIEWS=[["today","대시보드","today"],["work","업무","work"],["life","
 // which: 생략=개인 계정(노션·캘린더·개인 메일), "work"=회사 계정(chlee@hamkke.org 메일·캘린더)
 async function api(action,args,which){
   if(S.demo)return demoApi(action,args,which);
-  const url=which==="work"?S.cfg.url2:S.cfg.url;
+  const url=which==="work"?S.cfg.url2:which==="music"?(S.cfg.url3||S.cfg.url):S.cfg.url;
   if(!url)throw new Error("회사 계정 연결 주소가 없습니다");
   const r=await fetch(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({pass:S.cfg.pass,action,args})});
   let j;try{j=await r.json()}catch{throw new Error("서버 응답을 읽지 못했습니다. 배포 주소와 「모든 사용자」 권한을 확인해 주세요")}
@@ -1216,14 +1216,14 @@ function musicSheet(){
   const tabs=[["mine","내 재생목록"],["search","검색"],["saved","저장한 목록"]];
   let body;
   if(M.tab==="mine"){
-    if(!M.pls){if(!M.plsLoading){M.plsLoading=true;api("ytPlaylists",{}).then(r=>{M.pls=r}).catch(e=>{M.pls={error:e.message}}).finally(()=>{M.plsLoading=false;render()})}body=h("div",{class:"empty"},"유튜브 재생목록을 불러오는 중…")}
+    if(!M.pls){if(!M.plsLoading){M.plsLoading=true;api("ytPlaylists",{},"music").then(r=>{M.pls=r}).catch(e=>{M.pls={error:e.message}}).finally(()=>{M.plsLoading=false;render()})}body=h("div",{class:"empty"},"유튜브 재생목록을 불러오는 중…")}
     else if(M.pls.error)body=h("div",{class:"banner"},M.pls.error);
     else body=h("div",{class:"mlist"},M.pls.map(p=>[mrow({n:p.n,thumb:p.thumb,sub:p.count!=null?`${p.count}곡`:"",list:p.id},()=>playSrc({n:p.n,list:p.id}),
-      h("button",{class:"btn ghost sm",onclick:()=>{if(M.items[p.id]){delete M.items[p.id];render();return}M.items[p.id]="loading";render();api("ytItems",{list:p.id}).then(r=>{M.items[p.id]=r}).catch(e=>{M.items[p.id]={error:e.message}}).finally(render)}},M.items[p.id]?"접기":"곡 보기")),
+      h("button",{class:"btn ghost sm",onclick:()=>{if(M.items[p.id]){delete M.items[p.id];render();return}M.items[p.id]="loading";render();api("ytItems",{list:p.id},"music").then(r=>{M.items[p.id]=r}).catch(e=>{M.items[p.id]={error:e.message}}).finally(render)}},M.items[p.id]?"접기":"곡 보기")),
       M.items[p.id]==="loading"?h("div",{class:"empty"},"불러오는 중…"):Array.isArray(M.items[p.id])?h("div",{style:"padding-left:18px"},M.items[p.id].map(i=>mrow(i,()=>playSrc({n:i.n,v:i.v})))):M.items[p.id]&&M.items[p.id].error?h("div",{class:"banner"},M.items[p.id].error):null]));
   }else if(M.tab==="search"){
     body=h("div",{style:"display:grid;gap:10px"},h("input",{class:"in",id:"yt-q",placeholder:"곡·아티스트 검색 + Enter (예: 아이유, lofi jazz)",value:M.q||"",
-        onkeydown:e=>{if(e.key==="Enter"&&!e.isComposing&&e.target.value.trim()){M.q=e.target.value.trim();M.res="loading";render();api("ytSearch",{q:M.q}).then(r=>{M.res=r}).catch(er=>{M.res={error:er.message}}).finally(render)}}}),
+        onkeydown:e=>{if(e.key==="Enter"&&!e.isComposing&&e.target.value.trim()){M.q=e.target.value.trim();M.res="loading";render();api("ytSearch",{q:M.q},"music").then(r=>{M.res=r}).catch(er=>{M.res={error:er.message}}).finally(render)}}}),
       M.res==="loading"?h("div",{class:"empty"},"찾는 중…"):Array.isArray(M.res)?h("div",{class:"mlist"},M.res.map(i=>mrow(i,()=>playSrc({n:i.n,v:i.v}),h("button",{class:"icon-btn",title:"저장","aria-label":"저장한 목록에 넣기",onclick:()=>saveStation(i)},ic("plus"))))):M.res&&M.res.error?h("div",{class:"banner"},M.res.error):h("div",{class:"faint",style:"font-size:12px"},"검색 결과를 누르면 바로 재생됩니다"));
   }else{
     body=h("div",{style:"display:grid;gap:10px"},h("div",{class:"mlist"},M.list.map((s,i)=>mrow({n:s.n,v:s.v,list:s.list,thumb:s.v?`https://i.ytimg.com/vi/${s.v}/default.jpg`:null,sub:s.list?"재생목록":"영상"},()=>playStation(i),
@@ -1412,7 +1412,7 @@ async function connect(){
   const url=S.preset?S.preset.url:(S.drafts["su-url"]||"").trim(),pass=S.drafts["su-pass"]||"";
   if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){S.setupErr="Apps Script 웹 앱 주소(…/exec)를 넣어 주세요";render();return}
   const url2=S.preset?(S.preset.url2||null):((S.drafts["su-url2"]||"").trim()||null);
-  S.cfg={url,pass,url2};S.setupErr=null;const b=$("#su-go");if(b){b.disabled=true;b.textContent="연결하는 중…"}
+  S.cfg={url,pass,url2,url3:S.preset&&S.preset.url3||null};S.setupErr=null;const b=$("#su-go");if(b){b.disabled=true;b.textContent="연결하는 중…"}
   try{const d=await api("load",{});if(!d.notion)throw new Error("이 주소는 노션 키(NOTION_TOKEN)가 없는 서버입니다. 개인 계정 쪽 주소를 넣어 주세요");
     S.data=d;ls.set("desk:cfg",S.cfg);ls.set("desk:cache",d);S.drafts["su-pass"]="";render();toast("연결했습니다");if(url2)refresh(true)}
   catch(e){S.cfg=null;S.setupErr=e.message;render()}
@@ -1515,7 +1515,7 @@ async function demoApi(action,args){
 /* 시작: 저장된 화면 먼저, 노션은 뒤에서 */
 S.focus=ls.get("desk:focus",false);
 // 나중에 config.js에 회사 주소가 생기면 이미 연결된 기기에도 자동 반영
-if(S.cfg&&S.preset){if(!S.cfg.url2&&S.preset.url2){S.cfg.url2=S.preset.url2;ls.set("desk:cfg",S.cfg)}if(S.preset.url&&S.cfg.url!==S.preset.url){S.cfg.url=S.preset.url;ls.set("desk:cfg",S.cfg)}}
+if(S.cfg&&S.preset){if(!S.cfg.url2&&S.preset.url2){S.cfg.url2=S.preset.url2;ls.set("desk:cfg",S.cfg)}if(S.preset.url3&&S.cfg.url3!==S.preset.url3){S.cfg.url3=S.preset.url3;ls.set("desk:cfg",S.cfg)}if(S.preset.url&&S.cfg.url!==S.preset.url){S.cfg.url=S.preset.url;ls.set("desk:cfg",S.cfg)}}
 render();
 loadWx();
 if(S.cfg){refresh(true)}
