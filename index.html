@@ -1496,7 +1496,7 @@ function viewTools(){
   const links=card("바로가기",{icon:"ext"},h("div",{class:"chips"},
     [["노션 원데이터","https://app.notion.com/p/408d0752db638193a4c5ef39a90e2199"],["구글 캘린더","https://calendar.google.com"],["Gmail","https://mail.google.com"],["구글 드라이브","https://drive.google.com"],["유튜브 뮤직","https://music.youtube.com"]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))));
-  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},dday,links)];
+  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},apprCard(),h("div",{class:"stack"},dday,links))];
 }
 function tmParse(v){v=String(v).trim().replace(/분|min/g,"");let m=v.match(/^(\d{1,3}):(\d{1,2})$/);if(m)return (+m[1]*60+ +m[2])||null;m=v.match(/^(\d{1,3})$/);return m&&+m[1]>0?+m[1]*60:null}
 
@@ -1595,35 +1595,99 @@ function sheetView(){
     h("footer",null,h("span",{class:"faint",style:"font-size:11.5px;flex:1;align-self:center"},"바꾸면 노션에 바로 저장됩니다"),
       h("button",{class:"btn bad",onclick:e=>{const b=e.currentTarget;if(b.dataset.arm){trash("tasks",t.id,"tasks");S.sel=null}else{b.dataset.arm="1";b.textContent="한 번 더 누르면 삭제";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="휴지통으로"}},3000)}}},"휴지통으로")));
 }
-// 지출결의 준비: 스캔본마다 이카운트에 넣을 값을 적어 두고, 「이카운트용 복사」 → 이카운트 화면에서 「햄꾼 채우기」로 붙임
+// 지출결의 준비: 스캔본마다 이카운트에 넣을 값을 적어 두고, 「이카운트용 복사」 → 이카운트 복사 창에서 즐겨찾기 「햄꾼 채우기」
 S.exps=ls.get("desk:exps",{});
 function expOpen(x,f){const key=x.id+":"+(f?f.i:0),d=dOf(x.at);
-  if(!S.exps[key])S.exps[key]={key,d,file:f?`스캔본\${d.slice(0,7)}\${d}_${f.name}`:"",fname:f?f.name:"",subj:x.subj||"",
-    title:`모두의공모 ${+d.slice(5,7)}월 지출결의의 건`,vendor:"",amt:"",memo:"",purpose:"",pay:"계좌이체",budget:"",note:""};
+  if(!S.exps[key])S.exps[key]={key,d,file:f?`스캔본\\${d.slice(0,7)}\\${d}_${f.name}`:"",fname:f?f.name:"",subj:x.subj||"",
+    title:"[모두의공모] 1차년도 ○○ 지출 결과의 건",ref:"",purpose:"",when:"",paid:d,target:"",vendor:"",bizno:"",amt:"",memo:"",
+    docs:"관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서 등 각 1부",pay:"",budget:"(목) 사업비 (세목) (세세목)",note:""};
   S.sel={kind:"exp",key};render()}
+const kday=s=>{if(!s)return"";const d=new Date(s+"T00:00:00");return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}.(${"일월화수목금토"[d.getDay()]})`};
+// 지난 지출결의(10/27 와이파이 설치비 등)와 같은 본문 순서
+function expBody(e){return [e.ref?`기안(문서)번호: ${e.ref}`:null,`사용목적(상세내용) : ${e.purpose}`,`장소 및 일시(기간) : ${e.when?e.when+" - 진행일자, ":""}${kday(e.paid)} - 집행일자`,
+  `대상자 : ${e.target||e.vendor}`,`첨부서류 : ${e.docs}`,`결제방법(은행-계좌번호-예금주) : ${e.pay}`,`※ 모금회 예산과목 : ${e.budget}`].filter(Boolean).join("\n\n")}
 function expSheet(){
   const e=S.exps[S.sel.key];if(!e){S.sel=null;return null}
   const save=()=>{e.at=Date.now();ls.set("desk:exps",S.exps)};
-  const fld=(label,k,attrs)=>h("label",{class:"field"},h("label",null,label),h(attrs&&attrs.rows?"textarea":"input",Object.assign({class:"in",id:"ex-"+k,value:e[k]||"",oninput:ev=>{e[k]=ev.target.value;save()}},attrs||{})));
+  const fld=(label,k,attrs)=>h("label",{class:"field"},h("label",null,label),h(attrs&&attrs.rows?"textarea":"input",Object.assign({class:"in",id:"ex-"+k,value:e[k]||"",oninput:ev=>{e[k]=ev.target.value;save();const pv=$("#ex-pv");if(pv)pv.textContent=expBody(e)}},attrs||{})));
   const amt=+(String(e.amt).replace(/[^0-9]/g,""))||0;
   return h("aside",{class:"sheet","aria-label":"지출결의 준비"},
-    h("header",null,h("b",null,"지출결의 준비"),h("button",{class:"icon-btn","aria-label":"닫기",onclick:closeSheet},ic("x"))),
+    h("header",null,h("b",null,"지출결의 준비 · 이카운트"),h("button",{class:"icon-btn","aria-label":"닫기",onclick:closeSheet},ic("x"))),
     h("div",{class:"bd"},
-      h("div",{class:"note"},"📎 ",e.fname||"(첨부 없음)",e.file?h("div",{class:"faint",style:"font-size:11.5px;margin-top:2px"},"G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\\"+e.file):null),
+      h("div",{class:"note"},"📎 ",e.fname||"(첨부 없음)",e.file?h("div",{class:"faint",style:"font-size:11.5px;margin-top:2px"},"G:\\내 드라이브\\CLUDE\\클로드 작업물(회사컴)\\"+e.file):null),
       fld("기안 제목","title"),
-      h("div",{class:"grid g2",style:"gap:10px"},fld("지출 일자","d",{type:"date"}),fld("금액(원)","amt",{inputmode:"numeric",placeholder:"예) 130000"})),
+      fld("관련 기안(문서)번호·제목","ref",{placeholder:"예) 2026/10/08 -46 2025년 모두의공모 성과공유 워크숍 개최 계획(안)"}),
+      fld("사용목적(상세내용)","purpose",{rows:"2",placeholder:"예) 「모두의 공모」 1차년도 성과공유회 워크숍 와이파이 설치"}),
+      h("div",{class:"grid g2",style:"gap:10px"},fld("진행일자(장소 및 일시)","when",{placeholder:"예) 2026. 10. 16(금) ~ 17(토)"}),fld("집행일자","paid",{type:"date"})),
+      h("div",{class:"grid g2",style:"gap:10px"},fld("거래처명(대상자)","vendor",{placeholder:"예) 주식회사 에이피시스템"}),fld("사업자번호(거래처 코드)","bizno",{placeholder:"예) 816-88-03448"})),
+      h("div",{class:"grid g2",style:"gap:10px"},fld("금액(원)","amt",{inputmode:"numeric",placeholder:"예) 1700000"}),fld("적요(결의서 표)","memo",{placeholder:"예) 모두의공모 1차년도 성과공유회 워크숍 와이파이 설치"})),
       amt?h("div",{class:"faint",style:"font-size:12px;margin-top:-6px"},amt.toLocaleString()+"원"):null,
-      fld("거래처명","vendor",{placeholder:"예) ○○상사"}),
-      fld("적요","memo",{placeholder:"예) 10월 멘토링 진행비 지급"}),
-      fld("사용 목적","purpose",{rows:"2"}),
-      h("div",{class:"field"},h("label",null,"결제 방법"),h("div",{class:"chips"},["계좌이체","법인카드","현금"].map(v=>h("button",{class:"chip","aria-pressed":String(e.pay===v),onclick:()=>{e.pay=v;save();render()}},v)))),
-      fld("예산 과목","budget",{placeholder:"예) 사업비 > 일자리창출사업비 > 취약계층일자리"}),
+      fld("결제방법(은행 / 계좌번호 / 예금주)","pay",{placeholder:"예) IBK기업은행 / 541-064469-04-011 / (주)에이피시스템"}),
+      fld("첨부서류","docs"),
+      fld("모금회 예산과목","budget"),
+      h("div",{class:"field"},h("label",null,"본문 미리보기 (이카운트 지출결의서 내용칸에 들어감)"),h("div",{class:"note",id:"ex-pv",style:"font-size:12px"},expBody(e))),
       fld("메모(나만 보기)","note",{rows:"2"}),
-      h("div",{class:"faint",style:"font-size:12px;line-height:1.6"},"① 「이카운트용 복사」 → ② 이카운트 기안서 화면에서 즐겨찾기 「햄꾼 채우기」 → ③ 확인 후 임시저장")),
-    h("footer",null,h("button",{class:"btn go",onclick:()=>{if(!e.amt||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
-        e.ready=true;save();pfCopy(JSON.stringify({hamkkun:"exp",v:1,title:e.title,d:e.d,amt:amt,vendor:e.vendor,memo:e.memo,purpose:e.purpose,pay:e.pay,budget:e.budget,file:e.file,fname:e.fname}),"복사했습니다 · 이카운트에서 「햄꾼 채우기」를 누르세요");render()}},"이카운트용 복사"),
+      h("div",{class:"faint",style:"font-size:12px;line-height:1.7"},"① 「이카운트용 복사」 → ② 이카운트 내결재관리에서 비슷한 지난 문서 「복사」 → ③ 즐겨찾기 「햄꾼 채우기」 → ④ 노란 칸·첨부 확인 후 임시저장")),
+    h("footer",null,h("button",{class:"btn go",onclick:()=>{if(!amt||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
+        e.ready=true;save();pfCopy(JSON.stringify({hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요");render()}},"이카운트용 복사"),
       h("button",{class:"btn",onclick:()=>addTask({t:"지출결의서 작성 — "+(e.vendor||e.fname||e.subj),d:TODAY(),y:"예산·회계",note:"스캔: "+e.file})},"할 일로"),
       h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
+}
+
+/* ── 이카운트 즐겨찾기 버튼(북마클릿): 이카운트 화면에서 실행되는 코드 ── */
+function hkFill(){(async()=>{
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const say=(m,bad)=>{let b=document.getElementById("hk-say");if(!b){b=document.createElement("div");b.id="hk-say";document.body.append(b)}
+    b.style.cssText="position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:2147483647;background:"+(bad?"#c9302c":"#1c1c1e")+";color:#fff;padding:12px 18px;border-radius:12px;font:600 14px/1.6 sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:80vw;white-space:pre-line";
+    b.textContent="🐹 햄꾼 · "+m;clearTimeout(window.__hkT);window.__hkT=setTimeout(()=>b.remove(),12000)};
+  const title=document.querySelector("[data-cid=title]");
+  if(!title){say("기안서 작성 창이 없습니다.\n내결재관리에서 비슷한 지난 문서의 「복사」를 먼저 눌러 주세요.",1);return}
+  let t="";try{t=await navigator.clipboard.readText()}catch(e){}
+  if(!/"hamkkun":"exp"/.test(t))t=prompt("햄찌스 데스크 「이카운트용 복사」 내용을 붙여넣어 주세요 (Ctrl+V)")||"";
+  let d;try{d=JSON.parse(t)}catch(e){say("복사한 내용을 읽지 못했습니다. 대시보드에서 「이카운트용 복사」를 다시 눌러 주세요.",1);return}
+  if(d.hamkkun!=="exp"){say("지출결의 데이터가 아닙니다.",1);return}
+  const setv=(el,v)=>{el.focus();el.value=v;["input","keyup","change","blur"].forEach(x=>el.dispatchEvent(new Event(x,{bubbles:true})));el.style.background="#fff7c2"};
+  setv(title,d.title);
+  const body=document.querySelector("[data-cid=s_remarks]");if(body&&d.body)setv(body,d.body);
+  const first=document.querySelector('td[data-columnid=exp_amt][data-key="0"]');
+  if(!first){say("제목·본문은 채웠지만 지출결의서 표를 찾지 못했습니다. 지출결의서 창이 열려 있는지 확인해 주세요.",1);return}
+  const tr=first.closest("tr");
+  const cell=async(col,val)=>{if(val==null||val==="")return;const td=tr.querySelector("[data-columnid="+col+"]");if(!td)return;const o={bubbles:true,cancelable:true,view:window};
+    ["mousedown","mouseup","click"].forEach(x=>td.dispatchEvent(new MouseEvent(x,o)));await sleep(350);const inp=td.querySelector("input");if(!inp)return;
+    inp.focus();inp.value=val;["input","keyup","change"].forEach(x=>inp.dispatchEvent(new Event(x,{bubbles:true})));
+    inp.dispatchEvent(new KeyboardEvent("keydown",{key:"Tab",keyCode:9,which:9,bubbles:true}));await sleep(500);td.style.background="#fff7c2"};
+  if(d.bizno)await cell("exp_cust",d.bizno);
+  await cell("exp_cust_des",d.vendor);await cell("exp_amt",String(d.amt));await cell("exp_remarks",d.memo);
+  const more=[...document.querySelectorAll("td[data-columnid=exp_amt]")].filter(x=>x.getAttribute("data-key")!=="0"&&x.innerText.trim()).length;
+  say("채웠습니다 ✓ 노란 칸을 확인해 주세요."+(d.bizno?"":"\n거래처 코드는 이전 문서 값 그대로입니다. 꼭 바꿔 주세요.")+(more?"\n⚠ 아래 줄에 이전 문서 금액이 "+more+"줄 더 있습니다. 지워 주세요.":"")+"\n첨부할 파일: "+(d.file||"(없음)")+"\n확인 후 「임시저장」은 대표님이 눌러 주세요.");
+})()}
+function hkStatus(){(async()=>{
+  const say=m=>{let b=document.getElementById("hk-say");if(!b){b=document.createElement("div");b.id="hk-say";document.body.append(b)}
+    b.style.cssText="position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:2147483647;background:#1c1c1e;color:#fff;padding:12px 18px;border-radius:12px;font:600 14px/1.6 sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:pre-line";
+    b.textContent="🐹 햄꾼 · "+m;clearTimeout(window.__hkT);window.__hkT=setTimeout(()=>b.remove(),8000)};
+  const rows=[...document.querySelectorAll("tbody tr")].filter(tr=>tr.offsetParent&&/\d{4}\/\d{2}\/\d{2}-\d+/.test(tr.innerText));
+  if(!rows.length){say("결재 목록이 보이지 않습니다. 첫 화면이나 「내결재관리」에서 눌러 주세요.");return}
+  const out=rows.map(tr=>{const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
+    const big=[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);big.querySelectorAll(".label").forEach(x=>x.remove());
+    const title=big.innerText.trim().replace(/\s+/g," ");let st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();if(st==="결재")st="완료";return {no,title,st}});
+  const txt=JSON.stringify({hamkkun:"appr",v:1,at:new Date().toISOString(),rows:out});
+  try{await navigator.clipboard.writeText(txt);say(out.length+"건 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요.")}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
+})()}
+const bmk=fn=>"javascript:"+encodeURIComponent("("+fn.toString()+")()");
+S.appr=ls.get("desk:appr",null);
+function apprCard(){
+  const A=S.appr,col={"반려":"red","진행중":"blue","기안중":"","완료":"green","결재완료":"green"};
+  const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
+    try{const d=JSON.parse(t);if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render()}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
+  const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
+  return card("이카운트",{icon:"work",count:"지출결의 채우기 · 결재현황"},
+    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"아래 두 버튼을 크롬 ",h("b",null,"즐겨찾기 막대로 끌어다 놓으세요"),"(한 번만). 이카운트 화면에서 그 즐겨찾기를 누르면 동작합니다."),
+    h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
+      h("a",{class:"btn go",href:bmk(hkFill),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 채우기"),
+      h("a",{class:"btn pri",href:bmk(hkStatus),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 결재현황")),
+    h("div",{class:"row",style:"gap:8px"},h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기"),A?h("span",{class:"faint",style:"font-size:12px"},agoTxt(A.at)+" 기준"):null),
+    A&&A.rows.length?h("div",{class:"list"},A.rows.slice(0,15).map(r=>h("div",{class:"task"},h("span"),h("div",{class:"body"},h("span",{class:"tt"},r.title),h("div",{class:"meta"},h("span",null,r.no))),
+      r.st?h("span",{class:"pill "+(col[r.st]||"")},r.st):null))):null);
 }
 function jobSheet(){
   const j=byId(S.data.jobs,S.sel.id);if(!j){S.sel=null;return null}
