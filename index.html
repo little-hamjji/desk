@@ -837,7 +837,7 @@ async function refresh(quiet){
     const [d,w]=await Promise.all([api("load",{}),S.cfg&&S.cfg.url2&&!S.demo?api("load",{},"work").catch(e=>({error:e.message})):null]);
     if(w)d.work=w;else if(S.demo)d.work=S.data.work;
     S.data=d;if(!S.demo)ls.set("desk:cache",d);S.authErr=null;notifyEvents();
-    syncScans();
+    syncScans();syncIn();
   }
   catch(e){S.sync.err=e.message;if(!quiet)toast("불러오기 실패 · "+e.message,"bad");if(S.authErr&&!S.data){S.cfg=null;}}
   S.sync.busy=false;
@@ -1731,7 +1731,7 @@ function apprState(r){
 function apprCard(){
   const A=S.appr;
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
-    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render()}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
+    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
   const rows=A&&A.rows?A.rows.slice().sort((a,b)=>{const o={red:0,orange:1,blue:2,"":3,green:4};return o[apprState(a).c]-o[apprState(b).c]}):[];
   const md=d=>d?+d.slice(5,7)+"/"+ +d.slice(8,10):"";
@@ -1764,7 +1764,7 @@ function apprModal(){
       h("footer",null,h("button",{class:"btn",onclick:()=>pfCopy(r.no,"기안번호를 복사했습니다 · 이카운트 내결재관리 검색칸에 붙여넣으세요")},"기안번호 복사"),h("button",{class:"btn pri",onclick:close},"닫기"))));
 }
 /* ── 현금출납부 → 아직 안 쓴 지출결의를 할 일로 ──
-   출납부(F:\함께일하는재단\모두의 공모\★ 재단 현금출납부\*.xlsx)를 브라우저에서 바로 읽음(파일은 어디로도 올리지 않음).
+   출납부(F:\함께일하는재단\모두의 공모\★ 재단 현금출납부\*.xlsx)를 브라우저에서 바로 읽음(파일은 올리지 않고 빈칸 묶음만 노션에 보관).
    결의서번호(G열) 빈칸 = ① 지결 아직 안 씀 ② 썼는데 번호 미기입 → 같은 「내역」끼리 묶어 보여 주고 고른 것만 할 일로 */
 S.cash=ls.get("desk:cash",null);S.cashPick={};S.cashDone=new Set(ls.get("desk:cashDone",[]));
 function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=ok;s.onerror=()=>no(new Error("엑셀 읽기 도구를 불러오지 못했습니다"));document.head.append(s)})}
@@ -1783,7 +1783,7 @@ async function cashRead(file){
     S.cash={at:new Date().toISOString(),file:file.name,total:rows.length,blank:blank.length,groups:Object.values(g).sort((a,b)=>b.to.localeCompare(a.to))};
     ls.set("desk:cash",S.cash);S.cashPick={};const cut=new Date(Date.now()-75*864e5).toISOString().slice(0,10);
     S.cash.groups.forEach(x=>{if(x.sum>0&&x.to>=cut&&!cashHas(x))S.cashPick[x.key]=true});
-    toast(`결의서번호 빈칸 ${blank.length}줄 → 지출 ${S.cash.groups.length}묶음`);render();
+    toast(`결의서번호 빈칸 ${blank.length}줄 → 지출 ${S.cash.groups.length}묶음`);render();syncNow("cash");
   }catch(e){toast("출납부 읽기 실패 · "+e.message,"bad")}
 }
 const cashHas=x=>S.cashDone.has(x.key)||(S.data.tasks||[]).some(t=>(t.note||"").includes(x.key));
@@ -1809,7 +1809,7 @@ function cashCard(){
   const C=S.cash,pick=e=>e.currentTarget.files[0]&&cashRead(e.currentTarget.files[0]);
   const sel=C?C.groups.filter(x=>S.cashPick[x.key]&&!cashHas(x)):[];
   return card("현금출납부 → 미작성 지결",{icon:"att",count:C?`${agoTxt(C.at)} · ${C.file}`:"결의서번호 빈칸을 할 일로"},
-    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"「출납부 불러오기」 → ",h("b",null,"F:\\함께일하는재단\\모두의 공모\\★ 재단 현금출납부"),"의 최신 엑셀을 고르세요. 파일은 이 브라우저 안에서만 읽고 어디에도 올리지 않습니다. 결의서번호가 빈 지출을 같은 내역끼리 묶어 보여 줍니다."),
+    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"「출납부 불러오기」 → ",h("b",null,"F:\\함께일하는재단\\모두의 공모\\★ 재단 현금출납부"),"의 최신 엑셀을 고르세요. 엑셀 파일은 올리지 않고, 결의서번호가 빈 지출 묶음(내역·금액·거래처)만 노션에 저장해 폰에서도 같이 봅니다."),
     h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
       h("label",{class:"btn pri",style:"cursor:pointer"},ic("plus"),"출납부 불러오기",h("input",{type:"file",accept:".xlsx,.xls",style:"display:none",onchange:pick})),
       C?h("button",{class:"btn go",disabled:!sel.length,onclick:cashAdd},`고른 ${sel.length}건 할 일에 추가`):null),
@@ -1820,6 +1820,41 @@ function cashCard(){
           has?h("span",{class:"pill green"},"할 일 있음"):null,cand?h("span",{class:"pill blue",title:"이카운트 결재현황에 같은 금액 기안이 있습니다. 출납부에 번호만 적으면 될 수 있어요"},"번호 후보 "+cand):h("span",{class:"pill"},"지결 작성 필요"))),
         h("b",{class:"num"+(x.sum<=0?" faint":"")},x.sum.toLocaleString()))})):null);
 }
+/* ── 결재현황·출납부를 노션에 보관 ──
+   PC에서 불러온 자료는 노션으로 올리고, 다른 기기는 노션에서 받음. 불러온 시각(at)이 더 최근인 쪽이 이김 */
+const atOf=x=>x&&x.at?+new Date(x.at):0;
+const stepsTxt=s=>(s||[]).map(x=>x.d?x.r+" "+x.d:x.r).join(" → ");
+const stepsOf=t=>String(t||"").split(" → ").filter(Boolean).map(x=>{const m=x.match(/^(.+) (\d{4}\/\d{2}\/\d{2})$/);return m?{r:m[1],d:m[2]}:{r:x,d:""}});
+const SYNC={
+  appr:{rows:"apprRows",id:"no",ls:"desk:appr",local:()=>S.appr,list:A=>A.rows,meta:A=>({at:A.at,v:A.v}),
+    out:r=>({t:r.title,no:r.no,st:r.st,steps:stepsTxt(r.steps),amt:String(r.amt||""),files:(r.files||[]).join("\n"),detail:r.detail||""}),
+    back:(x,m)=>{S.appr={hamkkun:"appr",v:m.v,at:m.at,rows:x.map(r=>({no:r.no,title:r.t,st:r.st||"",steps:stepsOf(r.steps),amt:r.amt||"",files:r.files?r.files.split("\n"):[],detail:r.detail||""}))}}},
+  cash:{rows:"cashRows",id:"key",ls:"desk:cash",local:()=>S.cash,list:C=>C.groups,meta:C=>({at:C.at,file:C.file,total:C.total,blank:C.blank}),
+    out:x=>({t:x.memo,key:x.key,sum:x.sum,n:x.n,from:x.from,to:x.to,vendors:x.vendors.join("\n"),rows:x.rows.join(",")}),
+    back:(x,m)=>{S.cash=Object.assign({},m,{groups:x.map(r=>({key:r.key,memo:r.t,sum:r.sum,n:r.n,from:r.from,to:r.to,vendors:r.vendors?r.vendors.split("\n"):[],rows:r.rows?r.rows.split(",").map(Number):[]})).sort((a,b)=>b.to.localeCompare(a.to))})}},
+};
+// 바뀐 줄만 노션에 반영(한 번에 3건씩), 다 끝나면 불러온 시각 기록
+async function syncOut(k){
+  const c=SYNC[k],L=c.local();c.busy=true;
+  try{
+    const have=new Map(S.data[c.rows].map(x=>[x[c.id],x])),jobs=[];
+    c.list(L).map(c.out).forEach(f=>{const o=have.get(f[c.id]);have.delete(f[c.id]);
+      if(!o)jobs.push(()=>api("add",{kind:k,fields:f}));
+      else if(Object.keys(f).some(n=>String(f[n]??"")!==String(o[n]??"")))jobs.push(()=>api("update",{kind:k,id:o.id,fields:f}))});
+    have.forEach(o=>jobs.push(()=>api("trash",{kind:k,id:o.id})));
+    for(let i=0;i<jobs.length;i+=3)await Promise.all(jobs.slice(i,i+3).map(j=>j()));
+    await api("syncMark",{kind:k,meta:c.meta(L)});
+    c.busy=false;refresh(true);
+  }catch(e){c.busy=false;c.fail=true;toast("노션 저장 실패 · "+e.message,"bad")}
+}
+function syncIn(){
+  if(S.demo||!S.data)return;
+  Object.keys(SYNC).forEach(k=>{const c=SYNC[k],m=(S.data.syncMeta||{})[k],a=atOf(c.local()),b=atOf(m);
+    if(c.busy||!Array.isArray(S.data[c.rows]))return; // 옛 서버거나 노션 표를 못 읽었으면 그대로 둠
+    if(a>b){if(!c.fail)syncOut(k)}
+    else if(b>a){c.back(S.data[c.rows],m);ls.set(c.ls,c.local())}});
+}
+function syncNow(k){SYNC[k].fail=false;syncIn()}
 function jobSheet(){
   const j=byId(S.data.jobs,S.sel.id);if(!j){S.sel=null;return null}
   const up=(f,msg)=>mutate(D=>Object.assign(byId(D.jobs,j.id),f),()=>api("update",{kind:"job",id:j.id,fields:f}),msg);
