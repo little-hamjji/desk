@@ -20,7 +20,11 @@ const DB = {
   habit: '8bbb5b4ba81444c8865aa5656e505a2d', // 습관
   memo:  'd4e886a08e0b4b32a2e92b4b1e846e94', // 메모
   job:   'd242f23db7cd4f329a4f0cd84e1ef84e', // 이직 준비
+  log:   'b5d849ec6f384340a436e579b21216f5', // 햄꾼 일일 업무일지
+  sorry: '811a235fff054bf388139f6685f0b5f4', // 햄꾼 시말서
+  news:  '98b92fcd3e3945ee8a935ba09a06f6a1', // 이슈 팔로잉 아카이브(매일 뉴스 브리핑 메일)
 };
+// 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
 const TZ = 'Asia/Seoul';
 
@@ -52,7 +56,6 @@ function checkPass(pass) {
   const P = PropertiesService.getScriptProperties();
   const real = P.getProperty('PASS');
   if (!real) return '서버에 PASS(비밀번호)가 설정되지 않았습니다';
-  if (!P.getProperty('NOTION_TOKEN')) return '서버에 NOTION_TOKEN이 설정되지 않았습니다';
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('fails') || 0);
   if (fails >= 10) return '비밀번호를 여러 번 틀려 10분 동안 잠겼습니다';
@@ -79,6 +82,7 @@ function parse(res) {
 }
 function notion(path, method, body) { const r = nreq(path, method, body); return parse(UrlFetchApp.fetch(r.url, r)); }
 
+const WARN = []; // 연결 안 된 페이지 등 일부만 실패한 경우
 // 여러 DB를 한 번에(병렬) 조회. 100건 넘으면 이어서 받음
 function queryMany(specs) {
   const results = specs.map(() => []);
@@ -89,9 +93,11 @@ function queryMany(specs) {
     const resps = UrlFetchApp.fetchAll(reqs);
     const next = [];
     resps.forEach((r, k) => {
-      const j = parse(r), p = pending[k];
+      const p = pending[k];
+      let j;
+      try { j = parse(r); } catch (e) { if (!p.s.opt) throw e; WARN.push(p.s.opt + ': ' + e.message); return; }
       results[p.i].push.apply(results[p.i], j.results);
-      if (j.has_more && results[p.i].length < 600) next.push({ i: p.i, s: p.s, cursor: j.next_cursor });
+      if (j.has_more && results[p.i].length < (p.s.max || 600)) next.push({ i: p.i, s: p.s, cursor: j.next_cursor });
     });
     pending = next;
   }
@@ -104,6 +110,7 @@ function pv(p) {
   switch (p.type) {
     case 'title': case 'rich_text': return p[p.type].map(x => x.plain_text).join('');
     case 'select': return p.select ? p.select.name : null;
+    case 'multi_select': return p.multi_select.map(x => x.name);
     case 'status': return p.status ? p.status.name : null;
     case 'date': return p.date ? p.date.start : null;
     case 'checkbox': return p.checkbox;
@@ -144,7 +151,14 @@ const MAP = {
   month: { m: ['월', 'title'], rate: ['시급', 'num'], carry: ['전월 이월', 'num'], sub: ['대체 휴가', 'num'], total: ['총 시간', null], pay: ['수당', null],
            bonus: ['할증 누계', null], used: ['휴가 사용(일)', null] },
   leave: { y: ['연도', 'title'], total: ['총 연차', 'num'], special: ['총 특별휴가', 'num'], used: ['사용 일수', null], left: ['남은 일수', null] },
+  log:   { t: ['제목', 'title'], d: ['날짜', 'date'], kind: ['근무구분', 'select'], hours: ['근무시간', 'text'], sum: ['한 줄 요약', 'text'],
+           ev: ['대표님 평가', 'select'], sorry: ['시말서 제출', 'check'] },
+  sorry: { t: ['제목', 'title'], d: ['날짜', 'date'], cat: ['분류', 'select'], sev: ['심각도', 'select'], sum: ['사건 요약', 'text'],
+           fix: ['재발 방지책', 'text'], st: ['처리상태', 'select'] },
+  news:  { t: ['제목', 'title'], d: ['날짜', null], got: ['수집일', null], src: ['매체', null], kind: ['구분', null],
+           rules: ['관련 원칙', null], issue: ['이슈', null], link: ['원문 URL', null] },
 };
+const hasNotion = () => !!PropertiesService.getScriptProperties().getProperty('NOTION_TOKEN');
 function read(kind, page) {
   const o = { id: page.id, u: page.url };
   const m = MAP[kind];
@@ -183,8 +197,89 @@ function calendarEvents(from, to) {
 const ACTIONS = {
   load() {
     const today = ymd(new Date());
+    const base = { today, at: new Date().toISOString(), account: Session.getEffectiveUser().getEmail(), notion: hasNotion() };
+    let events = [], calError = null, mail = null, mailError = null;
+    try { events = calendarEvents(addDays(today, -14), addDays(today, 60)); } catch (e) { calError = String(e.message || e); }
+    try { mail = mailList(); } catch (e) { mailError = String(e.message || e); }
+    Object.assign(base, { events, calError, mail, mailError });
+    if (!base.notion) return base; // 회사 계정: 메일·캘린더만
+    return Object.assign(base, loadNotion(today));
+  },
+
+  // 메일: 읽음/안읽음/별표/보관
+  mailAct({ id, op }) {
+    const th = GmailApp.getThreadById(id);
+    if (!th) throw new Error('메일을 찾지 못했습니다');
+    if (op === 'read') th.markRead();
+    else if (op === 'unread') th.markUnread();
+    else if (op === 'archive') th.moveToArchive();
+    else if (op === 'star') th.getMessages().slice(-1)[0].star();
+    else if (op === 'unstar') th.getMessages().forEach(m => m.unstar());
+    else throw new Error('알 수 없는 메일 동작');
+    return { id, op };
+  },
+  mailBody({ id }) {
+    const th = GmailApp.getThreadById(id);
+    if (!th) throw new Error('메일을 찾지 못했습니다');
+    return th.getMessages().slice(-3).map(m => ({
+      from: m.getFrom(), to: m.getTo(), date: m.getDate().toISOString(), subject: m.getSubject(),
+      body: m.getPlainBody().replace(/\n{3,}/g, '\n\n').slice(0, 6000),
+    }));
+  },
+
+  // 노션 페이지 본문(업무일지 등)을 글자로
+  pageText({ id }) {
+    const lines = [];
+    let cursor = null;
+    do {
+      const j = notion('blocks/' + id + '/children?page_size=100' + (cursor ? '&start_cursor=' + cursor : ''));
+      j.results.forEach(b => {
+        const v = b[b.type] || {};
+        const txt = (v.rich_text || []).map(x => x.plain_text).join('');
+        const pre = { heading_1: '# ', heading_2: '## ', heading_3: '### ', bulleted_list_item: '• ', numbered_list_item: '• ', to_do: v.checked ? '☑ ' : '☐ ', quote: '│ ', callout: '💡 ' }[b.type] || '';
+        if (b.type === 'divider') lines.push('───');
+        else if (txt) lines.push(pre + txt);
+      });
+      cursor = j.has_more ? j.next_cursor : null;
+    } while (cursor && lines.length < 400);
+    return lines.join('\n');
+  },
+
+  // 유튜브(편집기 왼쪽 「서비스 +」에서 YouTube Data API v3를 추가해야 함)
+  ytPlaylists() {
+    yt();
+    const r = YouTube.Playlists.list('snippet,contentDetails', { mine: true, maxResults: 50 });
+    const out = [{ id: 'LL', n: '좋아요 표시한 동영상', count: null, thumb: null }];
+    (r.items || []).forEach(p => out.push({ id: p.id, n: p.snippet.title, count: p.contentDetails.itemCount, thumb: thumbOf(p.snippet.thumbnails) }));
+    return out;
+  },
+  ytItems({ list }) {
+    yt();
+    const r = YouTube.PlaylistItems.list('snippet', { playlistId: list, maxResults: 50 });
+    return (r.items || []).map(i => ({ v: i.snippet.resourceId.videoId, n: i.snippet.title, ch: i.snippet.videoOwnerChannelTitle || '', thumb: thumbOf(i.snippet.thumbnails) }));
+  },
+  ytSearch({ q }) {
+    yt();
+    const r = YouTube.Search.list('snippet', { q, type: 'video', maxResults: 15, videoEmbeddable: 'true', regionCode: 'KR' });
+    return (r.items || []).map(i => ({ v: i.id.videoId, n: i.snippet.title, ch: i.snippet.channelTitle, thumb: thumbOf(i.snippet.thumbnails) }));
+  },
+};
+function yt() { if (typeof YouTube === 'undefined') throw new Error('Apps Script 편집기에서 「서비스 +」→ YouTube Data API v3를 추가해 주세요'); }
+function thumbOf(t) { t = t || {}; return (t.medium || t.default || t.high || {}).url || null; }
+
+// 받은편지함 최근 30개 대화
+function mailList() {
+  return GmailApp.search('in:inbox', 0, 30).map(th => {
+    const m = th.getMessages().slice(-1)[0];
+    return { id: th.getId(), subj: th.getFirstMessageSubject() || '(제목 없음)', from: m.getFrom().replace(/<.*>/, '').replace(/"/g, '').trim() || m.getFrom(),
+      at: th.getLastMessageDate().toISOString(), snip: m.getPlainBody().replace(/\s+/g, ' ').slice(0, 140),
+      unread: th.isUnread(), star: th.hasStarredMessages(), imp: th.isImportant(), n: th.getMessageCount() };
+  });
+}
+
+function loadNotion(today) {
     const since = addDays(today, -60);
-    const [tasks, att, months, leave, habits, memos, jobs] = queryMany([
+    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news] = queryMany([
       { db: DB.tasks, body: { filter: { or: [
         { property: '상태', status: { does_not_equal: '완료' } },
         { property: '날짜', date: { on_or_after: since } },
@@ -196,11 +291,15 @@ const ACTIONS = {
       { db: DB.habit },
       { db: DB.memo, body: { filter: { property: '상태', select: { does_not_equal: '옮김' } }, sorts: [{ timestamp: 'created_time', direction: 'descending' }] } },
       { db: DB.job },
+      { db: DB.log, body: { page_size: 40, sorts: [{ property: '날짜', direction: 'descending' }] }, max: 40, opt: '햄꾼 업무일지' },
+      { db: DB.sorry, body: { page_size: 30, sorts: [{ property: '날짜', direction: 'descending' }] }, max: 30, opt: '햄꾼 시말서' },
+      { db: DB.news, body: { filter: { property: '수집일', date: { on_or_after: addDays(today, -45) } }, sorts: [{ property: '수집일', direction: 'descending' }] }, max: 400, opt: '뉴스 브리핑' },
     ]);
-    let events = [], calError = null;
-    try { events = calendarEvents(addDays(today, -14), addDays(today, 60)); } catch (e) { calError = String(e.message || e); }
     return {
-      today, at: new Date().toISOString(), calError,
+      logs: logs.map(p => read('log', p)),
+      sorries: sorries.map(p => read('sorry', p)),
+      news: news.map(p => read('news', p)),
+      warn: WARN.slice(),
       tasks: tasks.map(p => read('tasks', p)),
       att: att.map(p => read('att', p)),
       months: months.map(p => read('month', p)).sort((a, b) => (b.m || '').localeCompare(a.m || '')),
@@ -208,10 +307,10 @@ const ACTIONS = {
       habits: habits.map(p => read('habit', p)).sort((a, b) => (a.o || 99) - (b.o || 99)),
       memos: memos.map(p => read('memo', p)),
       jobs: jobs.map(p => read('job', p)),
-      events,
     };
-  },
+}
 
+Object.assign(ACTIONS, {
   // 공통: 추가·수정·휴지통
   add({ kind, fields }) {
     if (!DB[kind] || kind === 'month' || kind === 'leave') throw new Error('추가할 수 없는 종류입니다');
@@ -257,7 +356,7 @@ const ACTIONS = {
     else cal.createEvent(title, new Date(date + 'T' + start + ':00+09:00'), new Date(date + 'T' + (end || start) + ':00+09:00'));
     return { ok: true };
   },
-};
+});
 
 // 근태 기록에 「월」「연도」 연결을 자동으로 붙임(월 표 제목 예: 2026.11, 연차 표 제목 예: 2026)
 function linkAttendance(fields) {
