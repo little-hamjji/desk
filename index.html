@@ -1178,7 +1178,10 @@ function ytLoad(){if(M.loading||M.ready)return;M.loading=true;musicUI();window.o
   const st=M.cur||{};
   M.p=new YT.Player("yt",{width:"104",height:"58",videoId:st.v||undefined,playerVars:Object.assign({autoplay:1,playsinline:1,rel:0,controls:0,disablekb:1,origin:location.origin},st.list?{listType:"playlist",list:st.list}:{}),
     events:{onReady:e=>{M.ready=true;e.target.setVolume(M.vol);e.target.playVideo();musicUI()},
-      onStateChange:e=>{M.play=e.data===1;const d=M.p.getVideoData&&M.p.getVideoData();if(d){M.track=d.title||"";M.vid=d.video_id||M.vid}
+      onStateChange:e=>{M.play=e.data===1;
+        // 끊김 없이: 재생목록은 끝나면 처음부터, 한 곡짜리는 다음 저장 곡으로
+        if(e.data===1&&M.cur&&M.cur.list&&M.p.setLoop)M.p.setLoop(true);
+        if(e.data===0&&M.cur&&!M.cur.list){if(M.list.length>1)musicNext();else M.p.playVideo()}const d=M.p.getVideoData&&M.p.getVideoData();if(d){M.track=d.title||"";M.vid=d.video_id||M.vid}
         if(e.data===1&&M.track)document.title=`♪ ${M.track}`;else if(!TM.run)document.title="햄찌스 데스크";musicUI()},
       onError:()=>toast("이 곡은 다른 사이트 재생이 막혀 있습니다. 다음 곡으로 넘겨 주세요","bad")}})};
   document.head.append(h("script",{src:"https://www.youtube.com/iframe_api"}));}
