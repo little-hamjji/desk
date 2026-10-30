@@ -1415,7 +1415,7 @@ async function connect(){
   const url=S.preset?S.preset.url:(S.drafts["su-url"]||"").trim(),pass=S.drafts["su-pass"]||"";
   if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){S.setupErr="Apps Script 웹 앱 주소(…/exec)를 넣어 주세요";render();return}
   const url2=S.preset?(S.preset.url2||null):((S.drafts["su-url2"]||"").trim()||null);
-  S.cfg={url,pass,url2,url3:S.preset&&S.preset.url3||null};S.setupErr=null;const b=$("#su-go");if(b){b.disabled=true;b.textContent="연결하는 중…"}
+  S.cfg={url,pass,url2,url3:(window.DESK&&window.DESK.url3)||null};S.setupErr=null;const b=$("#su-go");if(b){b.disabled=true;b.textContent="연결하는 중…"}
   try{const d=await api("load",{});if(!d.notion)throw new Error("이 주소는 노션 키(NOTION_TOKEN)가 없는 서버입니다. 개인 계정 쪽 주소를 넣어 주세요");
     S.data=d;ls.set("desk:cfg",S.cfg);ls.set("desk:cache",d);S.drafts["su-pass"]="";render();toast("연결했습니다");if(url2)refresh(true)}
   catch(e){S.cfg=null;S.setupErr=e.message;render()}
@@ -1518,6 +1518,7 @@ async function demoApi(action,args){
 /* 시작: 저장된 화면 먼저, 노션은 뒤에서 */
 S.focus=ls.get("desk:focus",false);
 // 나중에 config.js에 회사 주소가 생기면 이미 연결된 기기에도 자동 반영
+if(S.cfg&&window.DESK&&window.DESK.url3&&S.cfg.url3!==window.DESK.url3){S.cfg.url3=window.DESK.url3;ls.set("desk:cfg",S.cfg)}
 if(S.cfg&&S.preset){if(!S.cfg.url2&&S.preset.url2){S.cfg.url2=S.preset.url2;ls.set("desk:cfg",S.cfg)}if(S.preset.url3&&S.cfg.url3!==S.preset.url3){S.cfg.url3=S.preset.url3;ls.set("desk:cfg",S.cfg)}if(S.preset.url&&S.cfg.url!==S.preset.url){S.cfg.url=S.preset.url;ls.set("desk:cfg",S.cfg)}}
 render();
 loadWx();
