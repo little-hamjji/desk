@@ -316,6 +316,22 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .note{font-size:13px;white-space:pre-wrap;background:rgba(0,0,0,.2);border-radius:8px;padding:8px 10px;color:var(--fg2)}
 .sheet footer{padding:12px 14px;border-top:.5px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
 
+.doc{display:grid;gap:4px;font-size:13.5px;line-height:1.6}
+.doc h3{margin:6px 0 2px;font-size:16px;font-weight:700}
+.doc section{background:rgba(0,0,0,.2);border-radius:10px;padding:10px 12px 8px;display:grid;gap:2px;margin-top:6px}
+.doc h4{margin:0 0 4px;font-size:12px;font-weight:700;color:#6cb4ff;letter-spacing:.02em;display:flex;align-items:center;gap:6px}
+.doc h4::before{content:"";width:3px;height:12px;border-radius:2px;background:#0a84ff}
+.doc h5{margin:6px 0 0;font-size:12.5px;font-weight:650;color:var(--fg)}
+.doc p{margin:0;color:var(--fg)}
+.doc .li{display:grid;grid-template-columns:14px 1fr;gap:4px;color:var(--fg)}
+.doc .li>i{font-style:normal;color:var(--fg3);text-align:center}
+.doc .li.done{color:var(--fg3);text-decoration:line-through}
+.doc blockquote{margin:2px 0;padding:2px 10px;border-left:2px solid var(--fg3);color:var(--fg2)}
+.doc hr{border:0;border-top:.5px solid var(--line);margin:8px 0}
+.sheet .grip{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:2;touch-action:none}
+.sheet .grip::after{content:"";position:absolute;left:3px;top:50%;width:4px;height:44px;margin-top:-22px;border-radius:2px;background:rgba(255,255,255,.18);opacity:0;transition:opacity .15s}
+.sheet:hover .grip::after,.sheet .grip.on::after{opacity:1}
+
 /* 명령 팔레트 */
 .veil{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40;display:grid;justify-items:center;align-items:start;padding:12vh 16px 16px}
 .palette{width:min(620px,100%);background:rgba(44,44,46,.9);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);
@@ -338,7 +354,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .sheen{position:absolute;width:140px;height:140px;border-radius:50%;pointer-events:none;
   background:conic-gradient(from 20deg,transparent 0 10%,rgba(255,255,255,.09) 14%,transparent 20% 58%,rgba(255,255,255,.07) 63%,transparent 69%)}
-.label{position:absolute;inset:0;margin:auto;width:58px;height:58px;border-radius:50%;overflow:hidden;background:var(--orange) center/cover no-repeat;box-shadow:0 0 0 2px #0c0c0d}
+.label{position:absolute;inset:0;margin:auto;width:58px;height:58px;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 50%,transparent 0 9px,rgba(0,0,0,.08) 9.5px 10px,transparent 10.5px 21px,rgba(140,110,70,.25) 21.5px 22px,transparent 22.5px),radial-gradient(circle at 35% 30%,#f6f1e6,#ddd3c0 75%) center/cover no-repeat;box-shadow:0 0 0 2px #0c0c0d}
 .label .yt{position:absolute;left:50%;top:50%;width:104px;height:58px;transform:translate(-50%,-50%)}
 .label .yt iframe,.label .yt>div{width:100%;height:100%;display:block;border:0;pointer-events:none}
 .label::after{content:"";position:absolute;inset:0;margin:auto;width:7px;height:7px;border-radius:50%;background:#1c1c1e;box-shadow:0 0 0 1.5px rgba(255,255,255,.35)}
@@ -434,8 +450,9 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .keys button{height:46px;border-radius:23px;border:0;background:#333336;font:500 18px var(--num)}
 .keys button:hover{filter:brightness(1.25)}
 .keys button.fn{background:#5a5a5e}
-.keys button.op{background:var(--orange);color:#fff}
-.keys button.op.on{background:#fff;color:var(--orange)}
+.keys button.op{background:rgba(10,132,255,.2);color:#6cb4ff;box-shadow:inset 0 0 0 .5px rgba(100,170,255,.28)}
+.keys button.op.on{background:#f5f5f7;color:#0a84ff}
+.keys button.op.eq{background:linear-gradient(180deg,#2b93ff,#0a6fe0);color:#fff;box-shadow:0 4px 14px rgba(10,132,255,.35)}
 .keys button.zero{grid-column:span 2}
 .tm-edit{font:200 40px var(--num);width:150px;text-align:center;background:rgba(0,0,0,.3);border:.5px solid var(--line);border-radius:10px;color:var(--fg)}
 
@@ -1039,7 +1056,7 @@ function tmTick(){const s=tmLeft();document.title=`${tmFmt(s)} · 집중`;const 
 function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)();[0,.25,.5].forEach(t=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.setValueAtTime(.15,a.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+t+.22);o.connect(g).connect(a.destination);o.start(a.currentTime+t);o.stop(a.currentTime+t+.23)})}catch{}}
 function viewTools(){
   const s=tmLeft(),R=96,c=2*Math.PI*R;
-  const dial=h("div",{class:"dial",html:`<svg viewBox="0 0 210 210"><circle cx="105" cy="105" r="${R}" fill="none" stroke="rgba(118,118,128,.28)" stroke-width="10"/><circle id="tm-r" data-c="${c}" cx="105" cy="105" r="${R}" fill="none" stroke="var(--orange)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-s/TM.dur)}"/></svg>`});
+  const dial=h("div",{class:"dial",html:`<svg viewBox="0 0 210 210"><defs><linearGradient id="tm-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#64d2ff"/><stop offset="1" stop-color="#0a84ff"/></linearGradient></defs><circle cx="105" cy="105" r="${R}" fill="none" stroke="rgba(118,118,128,.28)" stroke-width="10"/><circle id="tm-r" data-c="${c}" cx="105" cy="105" r="${R}" fill="none" stroke="url(#tm-g)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-s/TM.dur)}"/></svg>`});
   // 숫자를 누르면 직접 입력(예: 40, 1:30, 90분)
   dial.append(TM.edit?h("div",{class:"t"},h("input",{class:"tm-edit",id:"tm-in",value:tmFmt(s),"aria-label":"타이머 시간(분 또는 분:초)",
       onkeydown:e=>{if(e.key==="Enter"){const v=tmParse(e.target.value);TM.edit=false;if(v)tmReset(v);else{toast("예) 40 또는 25:00 처럼 넣어 주세요","bad");render()}}else if(e.key==="Escape"){TM.edit=false;render()}},
@@ -1101,7 +1118,7 @@ function clKey(k){
   document.querySelectorAll(".keys .op").forEach(b=>b.classList.toggle("on",CL.fresh&&CL.op===b.dataset.k));
 }
 function basicCalc(){
-  const K=[["AC","fn"],["±","fn"],["%","fn"],["÷","op"],["7"],["8"],["9"],["×","op"],["4"],["5"],["6"],["−","op"],["1"],["2"],["3"],["+","op"],["0","zero"],["."],["=","op"]];
+  const K=[["AC","fn"],["±","fn"],["%","fn"],["÷","op"],["7"],["8"],["9"],["×","op"],["4"],["5"],["6"],["−","op"],["1"],["2"],["3"],["+","op"],["0","zero"],["."],["=","op eq"]];
   return card("계산기",{icon:"tools",count:"키보드로도 입력",right:h("button",{class:"btn ghost sm",onclick:()=>{const v=String(+CL.cur);navigator.clipboard.writeText(v).then(()=>toast("복사했습니다 · "+v),()=>toast("복사가 막혀 있습니다","bad"))}},"복사")},
     h("div",{class:"calc",id:"calc",tabindex:"0","aria-label":"계산기(숫자·연산 키 입력 가능)",onkeydown:e=>{const m={"*":"×","x":"×","/":"÷","-":"−","+":"+","Enter":"=","=":"=","Backspace":"⌫","Escape":"AC","Delete":"AC","%":"%",".":"."};
         const k=/^[0-9]$/.test(e.key)?e.key:m[e.key];if(k){e.preventDefault();e.stopPropagation();clKey(k)}}},
@@ -1429,7 +1446,32 @@ function logSheet(){
     h("div",{class:"bd"},h("textarea",{class:"title",rows:"2",readonly:true,value:x.t||""}),
       isS?[x.sum?h("div",{class:"field"},h("label",null,"사건 요약"),h("div",{class:"note"},x.sum)):null,x.fix?h("div",{class:"field"},h("label",null,"재발 방지책"),h("div",{class:"note"},x.fix)):null]:
         h("div",{class:"field"},h("label",null,"대표님 평가"),h("div",{class:"chips"},["칭찬","보통","지적받음"].map(v=>h("button",{class:"chip","aria-pressed":String(x.ev===v),onclick:()=>updLog("log",x.id,{ev:x.ev===v?null:v},"logs")},v)))),
-      h("div",{class:"field"},h("label",null,"본문"),h("div",{class:"note",style:"color:var(--fg)"},txt==="loading"?"불러오는 중…":txt||""))));
+      h("div",{class:"field"},h("label",null,"본문"),txt==="loading"?h("div",{class:"note"},"불러오는 중…"):docView(txt||""))));
+}
+// 노션 본문(## 제목, • 목록 등)을 구역별로 나눠 보여 주기
+function docView(txt){
+  const out=[];let sec=null;const add=el=>sec?sec.push(el):out.push(el);
+  const close=()=>{if(sec){out.push(h("section",null,...sec));sec=null}};
+  txt.split("\n").forEach(l=>{
+    if(/^# /.test(l)){close();out.push(h("h3",null,l.slice(2)))}
+    else if(/^## /.test(l)){close();sec=[h("h4",null,l.slice(3))]}
+    else if(/^### /.test(l))add(h("h5",null,l.slice(4)));
+    else if(/^[•☐☑] /.test(l))add(h("div",{class:"li"+(l[0]==="☑"?" done":"")},h("i",null,l[0]==="•"?"•":l[0]),h("span",null,l.slice(2))));
+    else if(/^│ /.test(l))add(h("blockquote",null,l.slice(2)));
+    else if(l==="───"){close();out.push(h("hr"))}
+    else if(l.trim())add(h("p",null,l));
+  });close();
+  return h("div",{class:"doc"},...out);
+}
+// 오른쪽 창 왼쪽 가장자리를 끌어 넓히기(너비는 이 브라우저에 기억)
+function withGrip(el){
+  if(!el)return el;const w=ls.get("desk:sheetW",null);if(w)el.style.width=`min(${w}px,calc(100vw - 20px))`;
+  const g=h("div",{class:"grip",title:"끌어서 너비 조절(두 번 누르면 원래대로)",ondblclick:()=>{ls.set("desk:sheetW",null);el.style.width=""}});
+  g.addEventListener("pointerdown",e=>{e.preventDefault();g.setPointerCapture(e.pointerId);g.classList.add("on");const r=el.getBoundingClientRect().right;
+    const mv=ev=>{const nw=Math.max(340,Math.min(window.innerWidth-20,r-ev.clientX));el.style.width=nw+"px"};
+    const up=ev=>{g.classList.remove("on");g.removeEventListener("pointermove",mv);g.removeEventListener("pointerup",up);ls.set("desk:sheetW",Math.round(el.getBoundingClientRect().width))};
+    g.addEventListener("pointermove",mv);g.addEventListener("pointerup",up)});
+  el.prepend(g);return el;
 }
 
 /* 신호등: 빨강=잠그기(두 번), 노랑=사이드바 숨기기, 초록=전체 화면 */
@@ -1596,7 +1638,7 @@ function render(){
   const views={today:viewToday,work:viewWork,life:viewLife,news:viewNews,att:viewAtt,pf:viewPf,ham:viewHam,tools:viewTools};
   let content;try{content=(views[S.view]||viewToday)()}catch(e){console.error(e);content=h("div",{class:"banner"},"이 화면을 그리는 중 문제가 생겼습니다: "+e.message)}
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
-  fill(layer,...[sheetView(),paletteView(),quickModal(),diagView()].filter(Boolean));
+  fill(layer,...[withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
   renderSync();musicUI();restore();
   function restore(){if(!aeId)return;const el=document.getElementById(aeId);if(el&&el!==document.activeElement){el.focus();try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
@@ -1655,7 +1697,7 @@ async function demoApi(action,args){
   await new Promise(r=>setTimeout(r,150));
   if(action==="load")return S.data;
   if(action==="mailBody")return [{from:"예시",date:new Date().toISOString(),body:"예시 본문입니다."}];
-  if(action==="pageText")return "## 오늘 한 일\n• 예시 항목";
+  if(action==="pageText")return "# 2026-10-30 업무일지\n## 오늘 한 일\n• 햄찌스 데스크 스캔함·주식 카드 추가\n• 3~9월 업무 151건 노션 이관\n## 내일 할 일\n☐ 포트폴리오 탭 모션그래픽\n☑ 연결 끊김 원인 점검\n───\n│ 대표님 확인 필요: 10/18 야근 기록";
   if(action==="ytPlaylists"||action==="ytSearch"||action==="ytItems")throw new Error("예시 모드에서는 유튜브 계정을 불러오지 않습니다");
   if(action==="add")return Object.assign({id:"demo-"+Date.now()},args.fields);
   if(action==="update")return Object.assign({},byId(S.data[{tasks:"tasks",habit:"habits",memo:"memos",job:"jobs",att:"att"}[args.kind]]||[],args.id)||{},args.fields);
