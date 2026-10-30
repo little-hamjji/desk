@@ -205,7 +205,7 @@ const ACTIONS = {
     const today = ymd(new Date());
     const base = { today, at: new Date().toISOString(), account: Session.getEffectiveUser().getEmail(), notion: hasNotion() };
     let events = [], calError = null, mail = null, mailError = null;
-    try { events = calendarEvents(addDays(today, -14), addDays(today, 60)); } catch (e) { calError = String(e.message || e); }
+    try { events = calendarEvents(addDays(today, -45), addDays(today, 90)); } catch (e) { calError = String(e.message || e); }
     try { mail = mailList(); } catch (e) { mailError = String(e.message || e); }
     let scans = [];
     try { scans = scanList(); } catch (e) { base.scanError = String(e.message || e); }
