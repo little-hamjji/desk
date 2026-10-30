@@ -26,7 +26,9 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-10-30d'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-10-30e'; // 대시보드 「원인 확인」에 표시
+// 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
+const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
 const SCAN_LABEL = '데스크/스캔처리';
 const TZ = 'Asia/Seoul';
@@ -239,6 +241,20 @@ const ACTIONS = {
     const d = th.getMessages().slice(-1)[0].createDraftReply(String(body || ''));
     return { draft: d.getId() };
   },
+
+  // 스캔본 PC 보관(개인 계정 서버에서 실행): 회사 서버에서 받은 파일을 드라이브 폴더에 저장, 같은 파일은 한 번만
+  saveScan({ id, i, name, at, type, b64 }) {
+    const P = PropertiesService.getScriptProperties(), key = 'scan:' + id + ':' + i, had = P.getProperty(key);
+    if (had) { try { DriveApp.getFileById(had); return { key, file: had, dup: true }; } catch (e) {} }
+    const day = String(at || '').slice(0, 10) || Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+    let f = DriveApp.getRootFolder();
+    SCAN_DIR.concat([day.slice(0, 7)]).forEach(n => { const it = f.getFoldersByName(n); f = it.hasNext() ? it.next() : f.createFolder(n); });
+    const file = f.createFile(Utilities.newBlob(Utilities.base64Decode(b64), type || 'application/pdf', day + '_' + name));
+    file.setDescription('회사 메일 스캔 ' + key);
+    P.setProperty(key, file.getId());
+    return { key, file: file.getId(), path: SCAN_DIR.join('/') + '/' + day.slice(0, 7) + '/' + day + '_' + name };
+  },
+  scanSavedKeys() { return Object.keys(PropertiesService.getScriptProperties().getProperties()).filter(k => k.indexOf('scan:') === 0); },
 
   // 포트폴리오: 완료 업무 전체(3월~)
   history() {
