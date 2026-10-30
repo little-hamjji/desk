@@ -1670,15 +1670,16 @@ function hkStatus(){(async()=>{
   const out=rows.map(tr=>{const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
     const big=[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);big.querySelectorAll(".label").forEach(x=>x.remove());
     const title=big.innerText.trim().replace(/\s+/g," ");let st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();if(st==="결재")st="완료";return {no,title,st}});
-  const txt=JSON.stringify({hamkkun:"appr",v:1,at:new Date().toISOString(),rows:out});
+  const tj=Array.prototype.toJSON;delete Array.prototype.toJSON;const txt=JSON.stringify({hamkkun:"appr",v:1,at:new Date().toISOString(),rows:out});if(tj)Array.prototype.toJSON=tj;
   try{await navigator.clipboard.writeText(txt);say(out.length+"건 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요.")}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
 })()}
 const bmk=fn=>"javascript:"+encodeURIComponent("("+fn.toString()+")()");
-S.appr=ls.get("desk:appr",null);
+const apprFix=d=>{if(d&&typeof d.rows==="string"){try{d.rows=JSON.parse(d.rows)}catch(e){d.rows=[]}}if(d&&!Array.isArray(d.rows))d.rows=[];return d};
+S.appr=apprFix(ls.get("desk:appr",null));
 function apprCard(){
   const A=S.appr,col={"반려":"red","진행중":"blue","기안중":"","완료":"green","결재완료":"green"};
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
-    try{const d=JSON.parse(t);if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render()}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
+    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render()}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
   return card("이카운트",{icon:"work",count:"지출결의 채우기 · 결재현황"},
     h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"아래 두 버튼을 크롬 ",h("b",null,"즐겨찾기 막대로 끌어다 놓으세요"),"(한 번만). 이카운트 화면에서 그 즐겨찾기를 누르면 동작합니다."),
