@@ -345,7 +345,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .live-dot{animation:neon 2.4s ease-in-out infinite}
 .cv{display:grid;gap:8px;max-height:380px;overflow:auto}
 .cv>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;background:rgba(0,0,0,.18);border:.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.6}
-#tip{position:fixed;z-index:90;pointer-events:none;background:rgba(28,28,30,.96);border:.5px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 9px;font-size:12px;color:var(--fg);box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap}
+#tip{white-space:pre;line-height:1.5;position:fixed;z-index:90;pointer-events:none;background:rgba(28,28,30,.96);border:.5px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 9px;font-size:12px;color:var(--fg);box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap}
 /* 처음 들어올 때만 재생 */
 .pfw.play .rise{animation:rise .75s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*90ms)}
 @keyframes rise{from{opacity:0;transform:translateY(20px) scale(.985);filter:blur(4px)}}
@@ -353,12 +353,40 @@ tr.cur td{background:rgba(10,132,255,.1)}
 @keyframes draw{from{stroke-dasharray:0 600}}
 .pfw.play .mbar .stk{animation:grow .9s cubic-bezier(.2,.9,.25,1.12) both;animation-delay:calc(450ms + var(--i)*80ms)}
 @keyframes grow{from{transform:scaleY(0)}}
-.pfw.play .heat i{animation:pop .45s ease both;animation-delay:calc(450ms + var(--i)*16ms)}
-@keyframes pop{from{opacity:0;transform:scale(.2)}}
+.pfw.play .heat i{animation:pfpop .45s ease both;animation-delay:calc(450ms + var(--i)*16ms)}
+@keyframes pfpop{from{opacity:0;transform:scale(.2)}}
 .pfw.play .gbar{animation:sweep 1.1s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(450ms + var(--i)*90ms)}
 @keyframes sweep{from{transform:scaleX(0)}}
 .pfw.play .radar .poly{animation:bloom 1.3s cubic-bezier(.2,1.3,.4,1) both .45s;transform-box:view-box;transform-origin:120px 120px}
 @keyframes bloom{from{transform:scale(0) rotate(-40deg);opacity:0}}
+/* 도넛·레이더·흐름 그래프 움직임 */
+.donut{position:relative}.donut svg{position:relative}
+.d-glow{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle,rgba(57,135,229,.45),transparent 70%);filter:blur(16px);animation:breathe 4.5s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.15);opacity:.55}}
+.d-orbit{transform-origin:100px 100px;animation:spin 48s linear infinite}
+.d-orbit2{transform-origin:100px 100px;animation:spin 7s linear infinite reverse}
+.sg{transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .2s}.sg:hover{transform:translate(var(--dx),var(--dy))}.sg.dim{opacity:.25}
+.donut .dn{transition:fill .2s}.donut.hov .dl{fill:#fff}
+.dlist>div{grid-template-columns:10px minmax(0,1fr) auto 38px;row-gap:4px;padding:3px 6px;margin:0 -6px;border-radius:6px;cursor:default}
+.dlist>div:hover{background:rgba(255,255,255,.05)}
+.dlist .bar{grid-column:2/-1;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
+.dlist .bar i{display:block;height:100%;border-radius:2px;transform-origin:left}
+.pfw.play .dlist .bar i{animation:sweep 1s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(700ms + var(--i)*90ms)}
+.r-sweep{transform-origin:120px 120px;animation:spin 5s linear infinite}
+.r-glow{stroke-opacity:.55;animation:rpulse 3.2s ease-in-out infinite}@keyframes rpulse{50%{stroke-opacity:.12}}
+.r-halo{transform-box:fill-box;transform-origin:center;animation:halo 2.6s ease-out infinite;animation-delay:calc(var(--i)*.32s)}
+@keyframes halo{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.4);opacity:0}}
+.r-lab{transition:fill .2s}.r-lab.on{fill:#fff;font-weight:700}
+.r-pt circle:last-child{transition:r .2s}.r-pt:hover circle:last-child{r:6.5}
+.pfw.play .r-pt{animation:pfpop .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(1.2s + var(--i)*90ms);transform-box:fill-box;transform-origin:center}
+.flow svg{width:100%;height:auto;display:block;overflow:visible}
+.f-tot{font:600 12px var(--num);fill:rgba(235,235,245,.8)}.f-lb{font-size:12px;fill:rgba(235,235,245,.45)}
+.f-guide{opacity:0;transition:opacity .15s}.f-col:hover .f-guide{opacity:1}
+.f-dot{transition:r .15s,fill .15s}.f-col:hover .f-dot{r:7;fill:#a9d3ff}
+.f-shine{mix-blend-mode:overlay;animation:shine 7s ease-in-out infinite 2.4s}@keyframes shine{0%{transform:translateX(0)}55%,100%{transform:translateX(1250px)}}
+.pfw.play .f-reveal{animation:sweep 1.9s cubic-bezier(.45,.05,.2,1) both .3s;transform-box:fill-box;transform-origin:left}
+.pfw.play .f-line{stroke-dasharray:1;animation:dash 2s cubic-bezier(.45,.05,.2,1) both .3s}@keyframes dash{from{stroke-dashoffset:1}}
+.pfw.play .f-dot,.pfw.play .f-tot{animation:pfpop .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(.45s + var(--i)*200ms);transform-box:fill-box;transform-origin:center}
 /* 스토리 모드 */
 .story{position:fixed;inset:0;z-index:60;background:#06060a;display:grid;grid-template-rows:minmax(0,1fr) auto;color:var(--fg);overflow:hidden;isolation:isolate}
 .story .au{inset:-20%;opacity:.38}
@@ -1176,28 +1204,77 @@ function legendEl(byT){return h("div",{class:"legend"},VZK.filter(k=>byT[k]).map
 
 function donut(byT,size){
   const tot=Object.values(byT).reduce((a,b)=>a+b,0),R=80,C=2*Math.PI*R;let acc=0,i=0;
-  const segs=VZK.filter(k=>byT[k]).map(k=>{const v=byT[k],len=v/(tot||1)*C;
-    const s=`<circle class="donut-seg" style="--i:${i++}" cx="100" cy="100" r="${R}" fill="none" stroke="${VZ[k]}" stroke-width="22" stroke-dasharray="${Math.max(0,len-2).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}" transform="rotate(-90 100 100)" data-tip="${k} · ${v}건 (${Math.round(v/(tot||1)*100)}%)"/>`;
+  const segs=VZK.filter(k=>byT[k]).map(k=>{const v=byT[k],len=v/(tot||1)*C,mid=(acc+len/2)/C*2*Math.PI-Math.PI/2;
+    const s=`<g class="sg" data-k="${k}" data-v="${v}" style="--dx:${(Math.cos(mid)*7).toFixed(1)}px;--dy:${(Math.sin(mid)*7).toFixed(1)}px"><circle class="donut-seg" style="--i:${i++}" cx="100" cy="100" r="${R}" fill="none" stroke="${VZ[k]}" stroke-width="22" stroke-dasharray="${Math.max(0,len-2).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}" transform="rotate(-90 100 100)" data-tip="${k} · ${v}건 (${Math.round(v/(tot||1)*100)}%)"/></g>`;
     acc+=len;return s}).join("");
-  return h("div",{class:"donut",style:`width:${size}px;height:${size}px`,html:`<svg viewBox="0 0 200 200" role="img" aria-label="업무 유형 비중"><circle cx="100" cy="100" r="${R}" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="22"/>${segs}<text x="100" y="101" text-anchor="middle" class="dn" data-to="${tot}">${tot}</text><text x="100" y="122" text-anchor="middle" class="dl">완료 업무</text></svg>`});
+  const el=h("div",{class:"donut",style:`width:${size}px;height:${size}px`,html:`<div class="d-glow"></div><svg viewBox="0 0 200 200" role="img" aria-label="업무 유형 비중">
+    <circle class="d-orbit" cx="100" cy="100" r="97" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1" stroke-dasharray="2 6"/>
+    <circle class="d-orbit2" cx="100" cy="100" r="60" fill="none" stroke="rgba(100,180,255,.22)" stroke-width="1" stroke-dasharray="30 347"/>
+    <circle cx="100" cy="100" r="${R}" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="22"/>${segs}
+    <text x="100" y="101" text-anchor="middle" class="dn" data-to="${tot}">${tot}</text><text x="100" y="122" text-anchor="middle" class="dl">완료 업무</text></svg>`});
+  // 조각에 올리면 가운데 숫자가 그 유형으로 바뀜
+  const dn=el.querySelector(".dn"),dl=el.querySelector(".dl");
+  const hl=k=>{el.querySelectorAll(".sg").forEach(g=>g.classList.toggle("dim",!!k&&g.dataset.k!==k));el.classList.toggle("hov",!!k);
+    if(k){const g=el.querySelector(`.sg[data-k="${k}"]`);dn.textContent=g.dataset.v;dl.textContent=k}else{dn.textContent=tot;dl.textContent="완료 업무"}};
+  el.querySelectorAll(".sg").forEach(g=>{g.addEventListener("pointerenter",()=>hl(g.dataset.k));g.addEventListener("pointerleave",()=>hl(null))});
+  el._hl=hl;return el;
 }
 function radar(byT,size){
   const N=VZK.length,mx=Math.max(1,...VZK.map(k=>byT[k]||0)),c=120,R=82;
   const pt=(i,r)=>{const a=-Math.PI/2+i*2*Math.PI/N;return [c+Math.cos(a)*r,c+Math.sin(a)*r]};
   const ring=f=>`<polygon points="${VZK.map((_,i)=>pt(i,R*f).map(n=>n.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="rgba(255,255,255,${f===1?.14:.07})"/>`;
   const vals=VZK.map((k,i)=>pt(i,R*Math.max(.05,Math.sqrt((byT[k]||0)/mx))));
-  const lab=VZK.map((k,i)=>{const [x,y]=pt(i,R+18),a=Math.abs(x-c)<6?"middle":x<c?"end":"start";return `<text x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="${a}">${VZS[k]||k}</text>`}).join("");
-  return h("div",{class:"radar",style:size?`max-width:${size}px`:"",html:`<svg viewBox="0 0 240 240" role="img" aria-label="역량 분포">${[.25,.5,.75,1].map(ring).join("")}${VZK.map((_,i)=>{const [x,y]=pt(i,R);return `<line x1="${c}" y1="${c}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.06)"/>`}).join("")}
-    <defs><radialGradient id="rg"><stop offset="0" stop-color="#64d2ff" stop-opacity=".55"/><stop offset="1" stop-color="#3987e5" stop-opacity=".18"/></radialGradient></defs>
-    <g class="poly"><polygon points="${vals.map(v=>v.map(n=>n.toFixed(1)).join(",")).join(" ")}" fill="url(#rg)" stroke="#5b9cf0" stroke-width="2" stroke-linejoin="round"/>
-    ${vals.map((v,i)=>`<circle cx="${v[0].toFixed(1)}" cy="${v[1].toFixed(1)}" r="4" fill="${VZ[VZK[i]]}" stroke="#1c1c1e" stroke-width="2" data-tip="${VZK[i]} · ${byT[VZK[i]]||0}건"/>`).join("")}</g>${lab}</svg>`});
+  const poly=vals.map(v=>v.map(n=>n.toFixed(1)).join(",")).join(" ");
+  const lab=VZK.map((k,i)=>{const [x,y]=pt(i,R+18),a=Math.abs(x-c)<6?"middle":x<c?"end":"start";return `<text class="r-lab" data-i="${i}" x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="${a}">${VZS[k]||k}</text>`}).join("");
+  const el=h("div",{class:"radar",style:size?`max-width:${size}px`:"",html:`<svg viewBox="0 0 240 240" role="img" aria-label="역량 분포">
+    <defs><radialGradient id="rg"><stop offset="0" stop-color="#64d2ff" stop-opacity=".55"/><stop offset="1" stop-color="#3987e5" stop-opacity=".18"/></radialGradient>
+      <linearGradient id="rsw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#64d2ff" stop-opacity="0"/><stop offset="1" stop-color="#64d2ff" stop-opacity=".35"/></linearGradient>
+      <clipPath id="rclip"><circle cx="${c}" cy="${c}" r="${R}"/></clipPath><filter id="rglow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.5"/></filter></defs>
+    ${[.25,.5,.75,1].map(ring).join("")}${VZK.map((_,i)=>{const [x,y]=pt(i,R);return `<line x1="${c}" y1="${c}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.06)"/>`}).join("")}
+    <g clip-path="url(#rclip)"><g class="r-sweep"><path d="M${c},${c} L${c+R},${c} A${R},${R} 0 0,0 ${(c+R*Math.cos(-.9)).toFixed(1)},${(c+R*Math.sin(-.9)).toFixed(1)} Z" fill="url(#rsw)"/><line x1="${c}" y1="${c}" x2="${c+R}" y2="${c}" stroke="#64d2ff" stroke-opacity=".7" stroke-width="1.2"/></g></g>
+    <g class="poly"><polygon class="r-glow" points="${poly}" fill="none" stroke="#5b9cf0" stroke-width="5" filter="url(#rglow)"/>
+      <polygon class="r-area" points="${poly}" fill="url(#rg)" stroke="#5b9cf0" stroke-width="2" stroke-linejoin="round"/>
+      ${vals.map((v,i)=>`<g class="r-pt" data-i="${i}" style="--i:${i}"><circle class="r-halo" cx="${v[0].toFixed(1)}" cy="${v[1].toFixed(1)}" r="4" fill="${VZ[VZK[i]]}"/><circle cx="${v[0].toFixed(1)}" cy="${v[1].toFixed(1)}" r="4" fill="${VZ[VZK[i]]}" stroke="#1c1c1e" stroke-width="2" data-tip="${VZK[i]} · ${byT[VZK[i]]||0}건"/></g>`).join("")}</g>${lab}</svg>`});
+  // 점에 올리면 해당 축 이름이 밝아짐
+  el.querySelectorAll(".r-pt").forEach(g=>{const lb=el.querySelector(`.r-lab[data-i="${g.dataset.i}"]`);g.addEventListener("pointerenter",()=>lb.classList.add("on"));g.addEventListener("pointerleave",()=>lb.classList.remove("on"))});
+  return el;
 }
-function monthBars(st,height){
-  const tots=st.months.map(m=>Object.values(st.byM[m]).reduce((a,b)=>a+b,0)),mx=Math.max(1,...tots);
-  return h("div",{class:"mbars",style:`height:${height||210}px`},st.months.map((m,mi)=>{const o=st.byM[m];
-    return h("div",{class:"mbar"},h("span",{class:"tot","data-to":tots[mi]},tots[mi]),
-      h("div",{class:"mcol"},h("div",{class:"stk",style:`height:${tots[mi]/mx*100}%;--i:${mi}`},VZK.filter(k=>o[k]).map(k=>h("i",{style:`flex:${o[k]};background:${VZ[k]}`,"data-tip":`${+m.slice(5)}월 · ${k} ${o[k]}건`})))),
-      h("span",{class:"lb"},+m.slice(5)+"월"))}));
+// 월별 흐름: 업무 유형별로 쌓인 부드러운 영역 + 합계 선
+function monoPath(P){
+  const n=P.length;if(n===1)return `M${P[0][0]},${P[0][1]}`;const dx=[],m=[],t=[];
+  for(let i=0;i<n-1;i++){dx[i]=P[i+1][0]-P[i][0];m[i]=(P[i+1][1]-P[i][1])/dx[i]}
+  t[0]=m[0];t[n-1]=m[n-2];for(let i=1;i<n-1;i++)t[i]=m[i-1]*m[i]<=0?0:(m[i-1]+m[i])/2;
+  for(let i=0;i<n-1;i++){if(m[i]===0){t[i]=t[i+1]=0;continue}const a=t[i]/m[i],b=t[i+1]/m[i],s=a*a+b*b;if(s>9){const k=3/Math.sqrt(s);t[i]=k*a*m[i];t[i+1]=k*b*m[i]}}
+  let d=`M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+  for(let i=0;i<n-1;i++){const hh=dx[i]/3;d+=` C${(P[i][0]+hh).toFixed(1)},${(P[i][1]+t[i]*hh).toFixed(1)} ${(P[i+1][0]-hh).toFixed(1)},${(P[i+1][1]-t[i+1]*hh).toFixed(1)} ${P[i+1][0].toFixed(1)},${P[i+1][1].toFixed(1)}`}
+  return d;
+}
+function flowChart(st,height){
+  let ms=st.months.slice();if(ms.length===1)ms=[ms[0],ms[0]];
+  const W=1000,H=height||230,L=10,Rr=10,T=26,B=24,n=ms.length,ks=VZK.filter(k=>st.byT[k]);
+  const tots=ms.map(m=>Object.values(st.byM[m]).reduce((a,b)=>a+b,0)),mx=Math.max(1,...tots)*1.08;
+  const X=i=>L+i*(W-L-Rr)/(n-1),Y=v=>H-B-v/mx*(H-T-B);
+  const base=ms.map(()=>0);
+  const layers=ks.map(k=>{const lo=base.slice(),hi=ms.map((m,i)=>base[i]+=(st.byM[m][k]||0));
+    const top=monoPath(hi.map((v,i)=>[X(i),Y(v)])),bot=monoPath(lo.map((v,i)=>[X(i),Y(v)]).reverse()).replace(/^M/,"L");
+    return `<path d="${top} ${bot} Z" fill="${VZ[k]}" fill-opacity=".82" stroke="#1c1c1e" stroke-width="1"/>`}).join("");
+  const line=monoPath(tots.map((v,i)=>[X(i),Y(v)]));
+  const grid=[.25,.5,.75,1].map(f=>`<line x1="${L}" x2="${W-Rr}" y1="${Y(mx/1.08*f).toFixed(1)}" y2="${Y(mx/1.08*f).toFixed(1)}" stroke="rgba(255,255,255,.06)"/>`).join("");
+  const step=(W-L-Rr)/(n-1);
+  const cols=ms.map((m,i)=>{const o=st.byM[m],lines=ks.filter(k=>o[k]).sort((a,b)=>o[b]-o[a]).map(k=>`${k} ${o[k]}`).join("\n");
+    return `<g class="f-col" style="--i:${i}"><line class="f-guide" x1="${X(i)}" x2="${X(i)}" y1="${T-6}" y2="${H-B}" stroke="rgba(255,255,255,.35)" stroke-dasharray="3 3"/>
+      <circle class="f-dot" cx="${X(i).toFixed(1)}" cy="${Y(tots[i]).toFixed(1)}" r="4.5" fill="#0d0d12" stroke="#a9d3ff" stroke-width="2"/>
+      <text class="f-tot" x="${X(i).toFixed(1)}" y="${(Y(tots[i])-11).toFixed(1)}" text-anchor="middle">${tots[i]}</text>
+      <text class="f-lb" x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="${i===0?"start":i===n-1?"end":"middle"}">${+m.slice(5)}월</text>
+      <rect x="${(X(i)-step/2).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${H}" fill="transparent" data-tip="${+m.slice(5)}월 · 합계 ${tots[i]}건\n${lines}"/></g>`}).join("");
+  return h("div",{class:"flow",html:`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="월별 완료 업무 흐름">
+    <defs><clipPath id="fclip"><rect class="f-reveal" x="0" y="0" width="${W}" height="${H}"/></clipPath>
+      <filter id="fglow" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation="4"/></filter>
+      <linearGradient id="fshine" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<g clip-path="url(#fclip)">${layers}
+      <path d="${line}" fill="none" stroke="#a9d3ff" stroke-width="6" stroke-opacity=".45" filter="url(#fglow)"/>
+      <path class="f-line" d="${line}" fill="none" stroke="#e6f2ff" stroke-width="2" pathLength="1"/>
+      <rect class="f-shine" x="-120" y="0" width="120" height="${H}" fill="url(#fshine)"/></g>${cols}</svg>`});
 }
 function monthTable(st){
   const ks=VZK.filter(k=>st.byT[k]);
@@ -1243,10 +1320,11 @@ function viewPf(){
     h("div",{class:"pf-acts"},h("button",{class:"btn pri",onclick:()=>{PF.story=0;render()}},"▶ 스토리 모드 · 면접용"),
       h("button",{class:"btn",onclick:()=>pfCopy(cvLines(st).join("\n"),"경력기술서 문장을 복사했습니다")},"경력기술서 문장 복사"),
       h("button",{class:"btn ghost",onclick:()=>{pfLoad(true);render()}},ic("refresh"),"다시 불러오기")));
-  const typeCard=card("업무 유형 비중",{count:Object.keys(st.byT).length+"개 유형"},h("div",{class:"donut-wrap"},donut(st.byT,190),
-    h("div",{class:"dlist"},VZK.filter(k=>st.byT[k]).sort((a,b)=>st.byT[b]-st.byT[a]).map(k=>h("div",{"data-tip":`${k} · ${st.byT[k]}건`},h("i",{style:`background:${VZ[k]}`}),h("span",null,k),h("b",null,st.byT[k]),h("em",null,Math.round(st.byT[k]/st.n*100)+"%"))))));
+  const dnut=donut(st.byT,190),tmax=Math.max(...Object.values(st.byT));
+  const typeCard=card("업무 유형 비중",{count:Object.keys(st.byT).length+"개 유형 · 올리면 강조"},h("div",{class:"donut-wrap"},dnut,
+    h("div",{class:"dlist"},VZK.filter(k=>st.byT[k]).sort((a,b)=>st.byT[b]-st.byT[a]).map((k,ix)=>h("div",{style:`--i:${ix}`,onpointerenter:()=>dnut._hl(k),onpointerleave:()=>dnut._hl(null)},h("i",{style:`background:${VZ[k]}`}),h("span",null,k),h("b",{"data-to":st.byT[k]},st.byT[k]),h("em",null,Math.round(st.byT[k]/st.n*100)+"%"),h("span",{class:"bar"},h("i",{style:`width:${st.byT[k]/tmax*100}%;background:${VZ[k]}`})))))));
   const radarCard=card("역량 분포",{count:"유형별 완료 건수(상대값) · 점에 올리면 건수"},radar(st.byT,300));
-  const monthCard=card("월별 완료 업무",{count:"막대 = 업무 유형별 건수"},legendEl(st.byT),monthBars(st,220),
+  const monthCard=card("월별 완료 업무",{count:"색 영역 = 업무 유형별 건수 · 선 = 합계"},legendEl(st.byT),flowChart(st,250),
     h("details",null,h("summary",{class:"faint",style:"font-size:12px;cursor:pointer"},"표로 보기"),monthTable(st)));
   const ganttCard=card("프로젝트 타임라인",{count:`진행 중 ${liveN} · 완료 ${Object.keys(st.byP).length-liveN}`},gantt(st,active),
     h("div",{class:"faint",style:"font-size:11.5px"},"남은 할 일이 없는 프로젝트는 「완료」로 바뀌고 사이드바에서 빠집니다."));
@@ -1283,7 +1361,7 @@ function storySlides(st,active){
     h("div",{class:"pf-big"},big(st.n,"건","완료 업무"),big(Object.keys(st.byP).filter(p=>p!=="일상 운영").length,"개","프로젝트"),big(st.months.length,"개월","활동 기간"),big(st.hi,"건","중요도 상"))];
   const S2=()=>[h("p",{class:"pf-eye"},"WHAT I DID"),h("h2",{class:"s-h"},"어떤 일을 했나"),
     h("div",{class:"s-row"},donut(st.byT,300),h("div",{class:"s-list"},tys.slice(0,4).map(([k,v],i)=>h("div",{class:"rise",style:`--i:${i+2}`},h("i",{style:`background:${VZ[k]}`}),h("b",null,k),h("span",null,`${v}건 · ${Math.round(v/st.n*100)}%`)))))];
-  const S3=()=>[h("p",{class:"pf-eye"},"MONTH BY MONTH"),h("h2",{class:"s-h"},"매달 쌓인 일"),legendEl(st.byT),monthBars(st,340)];
+  const S3=()=>[h("p",{class:"pf-eye"},"MONTH BY MONTH"),h("h2",{class:"s-h"},"매달 쌓인 일"),legendEl(st.byT),flowChart(st,320)];
   const S4=()=>[h("p",{class:"pf-eye"},"PROJECTS"),h("h2",{class:"s-h"},"동시에 굴린 프로젝트"),h("div",{class:"s-wide"},gantt(st,active))];
   const SP=top.map(o=>()=>{const ex=o.list.filter(t=>t.r==="상"||t.out).slice(-4);const ty={};o.list.forEach(t=>{const y=t.y||"행정·공문";ty[y]=(ty[y]||0)+1});
     return [h("p",{class:"pf-eye"},`PROJECT · ${pfMM(o.first)} — ${pfMM(o.last)}`),h("h2",{class:"s-h",style:`--c:${PCOL[o.p]||"#5b9cf0"}`},h("i",{class:"live-dot s-dot",style:`--c:${PCOL[o.p]||"#5b9cf0"};background:${PCOL[o.p]||"#5b9cf0"}`}),o.p),
