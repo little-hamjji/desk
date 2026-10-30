@@ -26,7 +26,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-10-30b'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-10-30c'; // 대시보드 「원인 확인」에 표시
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
 const SCAN_LABEL = '데스크/스캔처리';
 const TZ = 'Asia/Seoul';
@@ -238,6 +238,16 @@ const ACTIONS = {
     if (!th) throw new Error('메일을 찾지 못했습니다');
     const d = th.getMessages().slice(-1)[0].createDraftReply(String(body || ''));
     return { draft: d.getId() };
+  },
+
+  // 답장 바로 보내기(대표님이 대시보드에서 직접 누를 때만)
+  sendReply({ id, body }) {
+    const th = GmailApp.getThreadById(id);
+    if (!th) throw new Error('메일을 찾지 못했습니다');
+    const me = Session.getEffectiveUser().getEmail(), msgs = th.getMessages();
+    const target = msgs.slice().reverse().find(m => m.getFrom().indexOf(me) < 0) || msgs[msgs.length - 1];
+    target.reply(String(body || ''));
+    return { to: target.getFrom() };
   },
 
   // 주식 시세(Yahoo Finance 공개 차트, 약 15~20분 지연)
