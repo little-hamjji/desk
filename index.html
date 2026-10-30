@@ -502,6 +502,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
 </div>
 <div id="layer"></div>
 
+<script src="config.js"></script>
 <script>
 "use strict";
 /* ═════════ 기본 도구 ═════════ */
@@ -570,7 +571,7 @@ const SCOL={"관심":"var(--gray)","서류 준비":"var(--yellow)","지원 완�
 
 /* ═════════ 상태 ═════════ */
 const S={
-  cfg:ls.get("desk:cfg",null), data:ls.get("desk:cache",null), demo:false,
+  cfg:ls.get("desk:cfg",null),preset:(window.DESK&&window.DESK.url)?window.DESK:null, data:ls.get("desk:cache",null), demo:false,
   view:ls.get("desk:view","today"), week:0, sel:null, drafts:{}, qmode:"task",
   f:{q:"",p:"",y:"",mode:"list"}, sync:{busy:false,err:null}, addDay:null, palette:null,
 };
@@ -1400,17 +1401,17 @@ function lightsEl(){let arm=false;
 function setupView(){
   const err=S.setupErr;
   return h("div",{class:"setup"},h("div",{class:"box"},
-    h("h2",null,"햄찌스 데스크"),h("p",null,"노션과 구글 캘린더를 실시간으로 읽고 쓰는 대시보드입니다. 처음 한 번만 연결 주소와 비밀번호를 넣어 주세요. 이 브라우저에만 저장됩니다."),
-    h("label",{class:"field"},h("label",null,"연결 주소 (Apps Script 웹 앱 URL)"),h("input",{class:"in",id:"su-url",placeholder:"https://script.google.com/macros/s/…/exec",value:S.drafts["su-url"]||"",oninput:e=>S.drafts["su-url"]=e.target.value})),
+    h("h2",null,"햄찌스 데스크"),h("p",null,"노션과 구글 캘린더를 실시간으로 읽고 쓰는 대시보드입니다. "+(S.preset?"이 기기에서 처음 한 번만 비밀번호를 넣어 주세요.":"처음 한 번만 연결 주소와 비밀번호를 넣어 주세요.")+" 이 브라우저에만 저장됩니다. 공용 PC에서는 쓰고 나서 빨간 버튼을 두 번 눌러 잠가 주세요."),
+    S.preset?null:h("label",{class:"field"},h("label",null,"연결 주소 (Apps Script 웹 앱 URL)"),h("input",{class:"in",id:"su-url",placeholder:"https://script.google.com/macros/s/…/exec",value:S.drafts["su-url"]||"",oninput:e=>S.drafts["su-url"]=e.target.value})),
     h("label",{class:"field"},h("label",null,"비밀번호 (Apps Script의 PASS 값)"),h("input",{class:"in",id:"su-pass",type:"password",autocomplete:"current-password",value:S.drafts["su-pass"]||"",oninput:e=>S.drafts["su-pass"]=e.target.value,onkeydown:e=>{if(e.key==="Enter")connect()}})),
-    h("label",{class:"field"},h("label",null,"회사 계정 연결 주소 (선택 · 회사 메일용, 나중에 넣어도 됩니다)"),h("input",{class:"in",id:"su-url2",placeholder:"https://script.google.com/macros/s/…/exec",value:S.drafts["su-url2"]||"",oninput:e=>S.drafts["su-url2"]=e.target.value})),
+    S.preset?null:h("label",{class:"field"},h("label",null,"회사 계정 연결 주소 (선택 · 회사 메일용, 나중에 넣어도 됩니다)"),h("input",{class:"in",id:"su-url2",placeholder:"https://script.google.com/macros/s/…/exec",value:S.drafts["su-url2"]||"",oninput:e=>S.drafts["su-url2"]=e.target.value})),
     err?h("div",{class:"err"},err):null,
     h("div",{class:"row"},h("button",{class:"btn pri",id:"su-go",onclick:connect},"연결"),h("button",{class:"btn",onclick:()=>{S.demo=true;S.data=demoData();render()}},"예시로 둘러보기"))));
 }
 async function connect(){
-  const url=(S.drafts["su-url"]||"").trim(),pass=S.drafts["su-pass"]||"";
+  const url=S.preset?S.preset.url:(S.drafts["su-url"]||"").trim(),pass=S.drafts["su-pass"]||"";
   if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){S.setupErr="Apps Script 웹 앱 주소(…/exec)를 넣어 주세요";render();return}
-  const url2=(S.drafts["su-url2"]||"").trim()||null;
+  const url2=S.preset?(S.preset.url2||null):((S.drafts["su-url2"]||"").trim()||null);
   S.cfg={url,pass,url2};S.setupErr=null;const b=$("#su-go");if(b){b.disabled=true;b.textContent="연결하는 중…"}
   try{const d=await api("load",{});if(!d.notion)throw new Error("이 주소는 노션 키(NOTION_TOKEN)가 없는 서버입니다. 개인 계정 쪽 주소를 넣어 주세요");
     S.data=d;ls.set("desk:cfg",S.cfg);ls.set("desk:cache",d);S.drafts["su-pass"]="";render();toast("연결했습니다");if(url2)refresh(true)}
@@ -1513,6 +1514,8 @@ async function demoApi(action,args){
 
 /* 시작: 저장된 화면 먼저, 노션은 뒤에서 */
 S.focus=ls.get("desk:focus",false);
+// 나중에 config.js에 회사 주소가 생기면 이미 연결된 기기에도 자동 반영
+if(S.cfg&&S.preset){if(!S.cfg.url2&&S.preset.url2){S.cfg.url2=S.preset.url2;ls.set("desk:cfg",S.cfg)}if(S.preset.url&&S.cfg.url!==S.preset.url){S.cfg.url=S.preset.url;ls.set("desk:cfg",S.cfg)}}
 render();
 loadWx();
 if(S.cfg){refresh(true)}
