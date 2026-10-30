@@ -407,6 +407,13 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .appr-steps .ok{color:#7ee2a0;background:rgba(48,209,88,.12)}.appr-steps .now{color:#409cff;background:rgba(10,132,255,.18);font-weight:700}
 .appr-steps i{font-style:normal;opacity:.5}
 .appr-d{display:flex;gap:8px;align-items:center;font-size:12px}
+/* 현금출납부 → 미작성 지결 */
+.cash{display:grid;gap:6px;max-height:460px;overflow:auto}
+.cash-r{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 10px;border:.5px solid var(--line);border-radius:10px;background:rgba(0,0,0,.16);cursor:pointer}
+.cash-r:hover{background:rgba(255,255,255,.04)}.cash-r.done{opacity:.55;cursor:default}
+.cash-r input{margin-top:3px;accent-color:#30d158}.cash-r .tt{font-size:12.8px;line-height:1.45}
+.cash-r .meta{display:flex;flex-wrap:wrap;gap:6px;font-size:11px;color:var(--fg3);margin-top:3px;align-items:center}
+.cash-r b{font:600 12.5px var(--num);white-space:nowrap}
 /* 일별 업무 밀도(월별) */
 .hm{display:grid;gap:12px}
 .hm-top{display:flex;align-items:center;gap:10px}
@@ -1516,7 +1523,7 @@ function viewTools(){
   const links=card("바로가기",{icon:"ext"},h("div",{class:"chips"},
     [["노션 원데이터","https://app.notion.com/p/408d0752db638193a4c5ef39a90e2199"],["구글 캘린더","https://calendar.google.com"],["Gmail","https://mail.google.com"],["구글 드라이브","https://drive.google.com"],["유튜브 뮤직","https://music.youtube.com"]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))));
-  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},apprCard(),h("div",{class:"stack"},dday,links))];
+  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},apprCard(),cashCard()),h("div",{class:"grid g2"},dday,links)];
 }
 function tmParse(v){v=String(v).trim().replace(/분|min/g,"");let m=v.match(/^(\d{1,3}):(\d{1,2})$/);if(m)return (+m[1]*60+ +m[2])||null;m=v.match(/^(\d{1,3})$/);return m&&+m[1]>0?+m[1]*60:null}
 
@@ -1752,6 +1759,63 @@ function apprModal(){
       r.files&&r.files.length?h("div",{class:"field"},h("label",null,"첨부"),h("div",{class:"chips"},r.files.map(f=>h("span",{class:"chip",style:"cursor:default"},"📎 "+f)))):null,
       r.detail?h("div",{class:"field"},h("label",null,"문서 내용"),h("div",{class:"note appr-txt"},r.detail)):null,
       h("footer",null,h("button",{class:"btn",onclick:()=>pfCopy(r.no,"기안번호를 복사했습니다 · 이카운트 내결재관리 검색칸에 붙여넣으세요")},"기안번호 복사"),h("button",{class:"btn pri",onclick:close},"닫기"))));
+}
+/* ── 현금출납부 → 아직 안 쓴 지출결의를 할 일로 ──
+   출납부(F:\함께일하는재단\모두의 공모\★ 재단 현금출납부\*.xlsx)를 브라우저에서 바로 읽음(파일은 어디로도 올리지 않음).
+   결의서번호(G열) 빈칸 = ① 지결 아직 안 씀 ② 썼는데 번호 미기입 → 같은 「내역」끼리 묶어 보여 주고 고른 것만 할 일로 */
+S.cash=ls.get("desk:cash",null);S.cashPick={};S.cashDone=new Set(ls.get("desk:cashDone",[]));
+function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=ok;s.onerror=()=>no(new Error("엑셀 읽기 도구를 불러오지 못했습니다"));document.head.append(s)})}
+const CASH_PJ=[[/성과공유회/,"성과공유회"],[/멘토링|멘토/,"모두의 멘토링"],[/운영위원회/,"운영위원회"],[/아카데미/,"모두의 아카데미"],[/레터|래터/,"모두의 레터"],[/2차년도|조정사업|심사/,"2차년도 심사·조정"],[/연차평가/,"1차년도 연차평가"],[/정산|반납|회계감사|변호사/,"1차년도 종료·정산"]];
+async function cashRead(file){
+  try{toast("출납부를 읽는 중…");await loadXLSX();
+    const wb=XLSX.read(await file.arrayBuffer(),{type:"array"}),ws=wb.Sheets["현금출납부(필수)"]||wb.Sheets[wb.SheetNames.find(n=>/현금출납부/.test(n))];
+    if(!ws)throw new Error("「현금출납부(필수)」 시트를 찾지 못했습니다");
+    const A=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    const day=v=>typeof v==="number"?new Date(Date.UTC(1899,11,30)+v*864e5).toISOString().slice(0,10):String(v).trim().replace(/\./g,"-").replace(/\s/g,"");
+    const rows=A.slice(4).map((r,i)=>({row:i+5,d:day(r[1]),kind:String(r[2]).trim(),amt:+r[3]||0,vendor:String(r[4]).trim(),memo:String(r[5]).trim(),no:String(r[6]).trim(),io:String(r[10]).trim()}))
+      .filter(x=>x.d&&/^\d{4}-\d{2}-\d{2}/.test(x.d)&&x.amt);
+    const blank=rows.filter(x=>!x.no&&x.io!=="입금"&&x.kind!=="수입결의서");
+    const g={};blank.forEach(x=>{const k=(x.memo||x.vendor)+"|"+x.d.slice(0,7);const o=g[k]||(g[k]={key:"출납부:"+k,memo:x.memo||x.vendor,sum:0,n:0,from:x.d,to:x.d,vendors:[],rows:[]});
+      o.sum+=x.amt;o.n++;if(x.d<o.from)o.from=x.d;if(x.d>o.to)o.to=x.d;if(x.vendor&&!o.vendors.includes(x.vendor))o.vendors.push(x.vendor);o.rows.push(x.row)});
+    S.cash={at:new Date().toISOString(),file:file.name,total:rows.length,blank:blank.length,groups:Object.values(g).sort((a,b)=>b.to.localeCompare(a.to))};
+    ls.set("desk:cash",S.cash);S.cashPick={};const cut=new Date(Date.now()-75*864e5).toISOString().slice(0,10);
+    S.cash.groups.forEach(x=>{if(x.sum>0&&x.to>=cut&&!cashHas(x))S.cashPick[x.key]=true});
+    toast(`결의서번호 빈칸 ${blank.length}줄 → 지출 ${S.cash.groups.length}묶음`);render();
+  }catch(e){toast("출납부 읽기 실패 · "+e.message,"bad")}
+}
+const cashHas=x=>S.cashDone.has(x.key)||(S.data.tasks||[]).some(t=>(t.note||"").includes(x.key));
+// 이카운트 결재현황(새 버튼)과 금액이 같으면 「번호 후보」
+const CASH_STOP=/^(지출|지급|위한|운영|운영을|1차년도|2차년도|모두의공모|모두의|결과의|건|및|관련|비용)$/;
+const cashWords=t=>new Set(String(t).replace(/[^가-힣A-Za-z0-9]+/g," ").split(" ").filter(w=>w.length>=2&&!CASH_STOP.test(w)));
+const cashCand=x=>{const A=S.appr;if(!A||!A.rows)return null;
+  const r=A.rows.find(r=>r.amt&&+String(r.amt).replace(/[^0-9]/g,"")===x.sum);if(r)return r.no;
+  const w=cashWords(x.memo);let best=null,hit=1;A.rows.forEach(r=>{const n=[...cashWords(r.title)].filter(t=>w.has(t)).length;if(n>hit){hit=n;best=r}});return best?best.no:null};
+async function cashAdd(){
+  const sel=S.cash.groups.filter(x=>S.cashPick[x.key]&&!cashHas(x));if(!sel.length)return toast("추가할 묶음을 골라 주세요","bad");
+  if(!S.cfg||S.demo)return toast("예시 모드에서는 추가하지 않습니다","bad");
+  let n=0;toast(`할 일 ${sel.length}건을 추가하는 중…`);
+  for(const x of sel){const cand=cashCand(x);
+    try{await api("add",{kind:"tasks",fields:{t:`지출결의서 작성 — ${x.memo.slice(0,60)} (${x.sum.toLocaleString()}원)`,s:"시작 전",d:TODAY(),c:"모두의공모",y:"예산·회계",
+      p:(CASH_PJ.find(([r])=>r.test(x.memo))||[])[1]||"일상 운영",
+      detail:`출납부 ${x.from}${x.to!==x.from?"~"+x.to:""} · ${x.n}줄 · 거래처 ${x.vendors.slice(0,4).join(", ")}${cand?` · 이카운트 금액 일치 기안 ${cand}(번호만 미기입일 수 있음)`:""}`,
+      note:`${x.key} · 출납부 행 ${x.rows.slice(0,12).join(",")}`}});
+      S.cashDone.add(x.key);n++}catch(e){toast("추가 실패 · "+e.message,"bad");break}}
+  ls.set("desk:cashDone",[...S.cashDone]);S.cashPick={};toast(`할 일 ${n}건을 추가했습니다`);refresh(true);
+}
+function cashCard(){
+  const C=S.cash,pick=e=>e.currentTarget.files[0]&&cashRead(e.currentTarget.files[0]);
+  const sel=C?C.groups.filter(x=>S.cashPick[x.key]&&!cashHas(x)):[];
+  return card("현금출납부 → 미작성 지결",{icon:"att",count:C?`${agoTxt(C.at)} · ${C.file}`:"결의서번호 빈칸을 할 일로"},
+    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"「출납부 불러오기」 → ",h("b",null,"F:\\함께일하는재단\\모두의 공모\\★ 재단 현금출납부"),"의 최신 엑셀을 고르세요. 파일은 이 브라우저 안에서만 읽고 어디에도 올리지 않습니다. 결의서번호가 빈 지출을 같은 내역끼리 묶어 보여 줍니다."),
+    h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
+      h("label",{class:"btn pri",style:"cursor:pointer"},ic("plus"),"출납부 불러오기",h("input",{type:"file",accept:".xlsx,.xls",style:"display:none",onchange:pick})),
+      C?h("button",{class:"btn go",disabled:!sel.length,onclick:cashAdd},`고른 ${sel.length}건 할 일에 추가`):null),
+    C?h("div",{class:"faint",style:"font-size:12px"},`전체 ${C.total.toLocaleString()}줄 중 결의서번호 빈칸 ${C.blank}줄 · ${C.groups.length}묶음 (최근 75일·금액 있는 것만 미리 골라 둠)`):null,
+    C&&C.groups.length?h("div",{class:"cash"},C.groups.slice(0,60).map(x=>{const has=cashHas(x),cand=cashCand(x);
+      return h("label",{class:"cash-r"+(has?" done":"")},h("input",{type:"checkbox",checked:!!S.cashPick[x.key]&&!has,disabled:has,onchange:e=>{S.cashPick[x.key]=e.target.checked;render()}}),
+        h("div",{class:"body"},h("span",{class:"tt"},x.memo),h("div",{class:"meta"},h("span",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),h("span",null,x.n+"줄"),h("span",null,x.vendors.slice(0,2).join(", ")),
+          has?h("span",{class:"pill green"},"할 일 있음"):null,cand?h("span",{class:"pill blue",title:"이카운트 결재현황에 같은 금액 기안이 있습니다. 출납부에 번호만 적으면 될 수 있어요"},"번호 후보 "+cand):h("span",{class:"pill"},"지결 작성 필요"))),
+        h("b",{class:"num"+(x.sum<=0?" faint":"")},x.sum.toLocaleString()))})):null);
 }
 function jobSheet(){
   const j=byId(S.data.jobs,S.sel.id);if(!j){S.sel=null;return null}
