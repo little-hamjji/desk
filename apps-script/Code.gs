@@ -26,6 +26,9 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
+const VERSION = '2026-10-30b'; // 대시보드 「원인 확인」에 표시
+const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
+const SCAN_LABEL = '데스크/스캔처리';
 const TZ = 'Asia/Seoul';
 
 /* ───────── 입구 ───────── */
@@ -60,6 +63,7 @@ function checkPass(pass) {
   const fails = Number(cache.get('fails') || 0);
   if (fails >= 10) return '비밀번호를 여러 번 틀려 10분 동안 잠겼습니다';
   if (String(pass || '') !== real) { cache.put('fails', String(fails + 1), 600); return '비밀번호가 맞지 않습니다'; }
+  if (fails) cache.remove('fails'); // 맞게 넣으면 틀린 횟수 초기화
   return null;
 }
 
@@ -201,9 +205,55 @@ const ACTIONS = {
     let events = [], calError = null, mail = null, mailError = null;
     try { events = calendarEvents(addDays(today, -14), addDays(today, 60)); } catch (e) { calError = String(e.message || e); }
     try { mail = mailList(); } catch (e) { mailError = String(e.message || e); }
-    Object.assign(base, { events, calError, mail, mailError });
+    let scans = [];
+    try { scans = scanList(); } catch (e) { base.scanError = String(e.message || e); }
+    Object.assign(base, { events, calError, mail, mailError, scans, v: VERSION });
     if (!base.notion) return base; // 회사 계정: 메일·캘린더만
     return Object.assign(base, loadNotion(today));
+  },
+
+  // 연결 확인용
+  ping() { return { account: Session.getEffectiveUser().getEmail(), notion: hasNotion(), v: VERSION }; },
+
+  // 스캔 메일 첨부 내려받기(대시보드에서 바로 저장)
+  scanFile({ id, i }) {
+    const m = GmailApp.getMessageById(id);
+    if (!m) throw new Error('스캔 메일을 찾지 못했습니다');
+    const a = m.getAttachments({ includeInlineImages: false })[i];
+    if (!a) throw new Error('첨부 파일을 찾지 못했습니다');
+    if (a.getSize() > 30e6) throw new Error('30MB가 넘는 파일은 Gmail에서 직접 받아 주세요');
+    return { name: a.getName(), type: a.getContentType(), b64: Utilities.base64Encode(a.getBytes()) };
+  },
+  // 스캔 처리 표시(Gmail 라벨 「데스크/스캔처리」)
+  scanDone({ th, on }) {
+    const label = GmailApp.getUserLabelByName(SCAN_LABEL) || GmailApp.createLabel(SCAN_LABEL);
+    const t = GmailApp.getThreadById(th);
+    if (!t) throw new Error('스캔 메일을 찾지 못했습니다');
+    on ? t.addLabel(label) : t.removeLabel(label);
+    return { th, on };
+  },
+  // 답장 초안을 Gmail 임시보관함에 저장(보내기는 대표님이 Gmail에서)
+  draftReply({ id, body }) {
+    const th = GmailApp.getThreadById(id);
+    if (!th) throw new Error('메일을 찾지 못했습니다');
+    const d = th.getMessages().slice(-1)[0].createDraftReply(String(body || ''));
+    return { draft: d.getId() };
+  },
+
+  // 주식 시세(Yahoo Finance 공개 차트, 약 15~20분 지연)
+  stocks({ syms, range }) {
+    const R = { '1d': ['1d', '5m'], '5d': ['5d', '30m'], '1mo': ['1mo', '1d'], '6mo': ['6mo', '1d'], '1y': ['1y', '1wk'] }[range] || ['1mo', '1d'];
+    const list = (syms || []).slice(0, 12);
+    const reqs = list.map(sym => ({ url: 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=' + R[0] + '&interval=' + R[1],
+      muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } }));
+    return UrlFetchApp.fetchAll(reqs).map((r, k) => {
+      try {
+        const j = JSON.parse(r.getContentText()).chart.result[0], m = j.meta, q = j.indicators.quote[0];
+        const pts = (j.timestamp || []).map((t, i) => q.close[i]).filter(v => v != null).map(v => Math.round(v * 100) / 100);
+        return { sym: list[k], name: m.shortName || m.longName || list[k], cur: m.currency, price: m.regularMarketPrice,
+          prev: m.chartPreviousClose != null ? m.chartPreviousClose : m.previousClose, pts, t: m.regularMarketTime };
+      } catch (e) { return { sym: list[k], error: '시세를 불러오지 못했습니다(코드 확인)' }; }
+    });
   },
 
   // 메일: 읽음/안읽음/별표/보관
@@ -269,12 +319,27 @@ function thumbOf(t) { t = t || {}; return (t.medium || t.default || t.high || {}
 
 // 받은편지함 최근 30개 대화
 function mailList() {
-  return GmailApp.search('in:inbox', 0, 30).map(th => {
+  return GmailApp.search('in:inbox -from:' + SCAN_FROM, 0, 30).map(th => {
     const m = th.getMessages().slice(-1)[0];
     return { id: th.getId(), subj: th.getFirstMessageSubject() || '(제목 없음)', from: m.getFrom().replace(/<.*>/, '').replace(/"/g, '').trim() || m.getFrom(),
       at: th.getLastMessageDate().toISOString(), snip: m.getPlainBody().replace(/\s+/g, ' ').slice(0, 140),
       unread: th.isUnread(), star: th.hasStarredMessages(), imp: th.isImportant(), n: th.getMessageCount() };
   });
+}
+
+// 스캔 메일(회사 복합기 → chlee@hamkke.org) 최근 120일
+function scanList() {
+  const label = GmailApp.getUserLabelByName(SCAN_LABEL);
+  const done = new Set(label ? label.getThreads(0, 300).map(t => t.getId()) : []);
+  const out = [];
+  GmailApp.search('from:' + SCAN_FROM + ' newer_than:120d', 0, 40).forEach(th => {
+    th.getMessages().forEach(m => {
+      if (m.getFrom().indexOf(SCAN_FROM) < 0) return;
+      const files = m.getAttachments({ includeInlineImages: false }).map((a, i) => ({ i, name: a.getName(), size: a.getSize(), type: a.getContentType() }));
+      if (files.length) out.push({ id: m.getId(), th: th.getId(), at: m.getDate().toISOString(), subj: m.getSubject(), files, done: done.has(th.getId()) });
+    });
+  });
+  return out.sort((a, b) => (a.at < b.at ? 1 : -1));
 }
 
 function loadNotion(today) {
