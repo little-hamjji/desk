@@ -348,7 +348,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
 #tip{white-space:pre;line-height:1.5;position:fixed;z-index:90;pointer-events:none;background:rgba(28,28,30,.96);border:.5px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 9px;font-size:12px;color:var(--fg);box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:nowrap}
 /* 처음 들어올 때만 재생 */
 .pfw.play .rise{animation:rise .75s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*90ms)}
-@keyframes rise{from{opacity:0;transform:translateY(20px) scale(.985);filter:blur(4px)}}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}}
 .pfw.play .donut-seg{animation:draw 1.1s cubic-bezier(.3,.7,.2,1) both;animation-delay:calc(350ms + var(--i)*110ms)}
 @keyframes draw{from{stroke-dasharray:0 600}}
 .pfw.play .mbar .stk{animation:grow .9s cubic-bezier(.2,.9,.25,1.12) both;animation-delay:calc(450ms + var(--i)*80ms)}
@@ -392,8 +392,11 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .story .au{inset:-20%;opacity:.38}
 .s-x{position:absolute;top:16px;right:18px;z-index:2}
 .s-stage{display:grid;place-items:center;padding:7vh 7vw 2vh;overflow:auto;cursor:pointer}
-.s-slide{width:100%;max-width:1040px;display:grid;gap:18px;text-align:left;animation:sIn .7s cubic-bezier(.2,.8,.2,1) both;cursor:auto}
-@keyframes sIn{from{opacity:0;transform:translateY(28px) scale(.97);filter:blur(8px)}}
+.s-slide{width:100%;max-width:1040px;display:grid;gap:18px;text-align:left;animation:sIn .6s cubic-bezier(.2,.8,.2,1) both;cursor:auto;transition:opacity .22s ease,transform .22s ease}
+.s-slide.out{opacity:0;transform:translateY(-10px)}
+@keyframes sIn{from{opacity:0;transform:translateY(16px)}}
+.story{animation:fadeIn .35s ease both}.story.bye{opacity:0;transition:opacity .25s}
+@keyframes fadeIn{from{opacity:0}}
 .s-h{margin:0;font-size:clamp(28px,4vw,52px);font-weight:760;letter-spacing:-.025em;display:flex;align-items:center;gap:14px}
 .s-dot{width:14px;height:14px;border-radius:50%;flex:none}
 .s-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:40px;align-items:center}
@@ -1317,7 +1320,7 @@ function viewPf(){
     h("p",{class:"pf-sub"},PF.loading&&!(PF.hist&&PF.hist.items)?"3월부터의 전체 기록을 불러오는 중…":PF.err&&!PF.hist?"전체 기록을 불러오지 못해 최근 기록만 보입니다 · "+PF.err:`노션에 쌓인 완료 업무 ${st.n}건을 데이터로 정리했습니다`),
     h("div",{class:"pf-big"},[["완료 업무",st.n,"건"],["프로젝트",projN,"개"],["활동 기간",st.months.length,"개월"],["중요도 상",st.hi,"건"]].map(([l,v,u],i)=>
       h("div",{class:"rise",style:`--i:${i+1}`},h("b",null,h("span",{"data-to":v},v.toLocaleString()),h("em",null,u)),h("small",null,l)))),
-    h("div",{class:"pf-acts"},h("button",{class:"btn pri",onclick:()=>{PF.story=0;render()}},"▶ 스토리 모드 · 면접용"),
+    h("div",{class:"pf-acts"},h("button",{class:"btn pri",onclick:()=>{PF.story=0;storyOpen()}},"▶ 스토리 모드 · 면접용"),
       h("button",{class:"btn",onclick:()=>pfCopy(cvLines(st).join("\n"),"경력기술서 문장을 복사했습니다")},"경력기술서 문장 복사"),
       h("button",{class:"btn ghost",onclick:()=>{pfLoad(true);render()}},ic("refresh"),"다시 불러오기")));
   const dnut=donut(st.byT,190),tmax=Math.max(...Object.values(st.byT));
@@ -1370,20 +1373,27 @@ function storySlides(st,active){
   const SE=()=>[h("p",{class:"pf-eye"},"SUMMARY"),h("h2",{class:"s-h"},"정리하면"),h("div",{class:"s-cards one"},cvLines(st).slice(0,3).map((l,i)=>h("div",{class:"rise",style:`--i:${i+2}`},h("b",null,l))))];
   return [S1,S2,S3,S4,...SP,SE];
 }
-function storyLayer(){
-  if(PF.story==null||S.view!=="pf"||!S.data)return null;
-  const items=pfItems(),st=pfStats(items);if(!st.n){PF.story=null;return null}
-  const active=new Set(S.data.tasks.filter(t=>!isDone(t)&&t.p).map(t=>t.p));
-  const sl=storySlides(st,active),i=Math.max(0,Math.min(PF.story,sl.length-1));
-  const go=d=>{PF.story=Math.max(0,Math.min(sl.length-1,i+d));render()};
-  const el=h("div",{class:"story",role:"dialog","aria-label":"스토리 모드"},h("div",{class:"au"},h("i"),h("i"),h("i")),h("div",{class:"grain"}),
-    h("button",{class:"icon-btn s-x","aria-label":"닫기 (Esc)",onclick:()=>{PF.story=null;render()}},ic("x")),
-    h("div",{class:"s-stage",onclick:e=>{if(!e.target.closest("button,details,a"))go(1)}},h("div",{class:"s-slide pfw play"},...[].concat(sl[i]()).filter(Boolean))),
-    h("div",{class:"s-nav"},h("button",{class:"btn sm",disabled:i===0,onclick:()=>go(-1)},"← 이전"),
-      h("div",{class:"s-dots"},sl.map((_,k)=>h("button",{class:k===i?"on":"","aria-label":`${k+1}번째 장`,onclick:()=>{PF.story=k;render()}}))),
-      h("button",{class:"btn pri sm",onclick:()=>{if(i===sl.length-1){PF.story=null;render()}else go(1)}},i===sl.length-1?"마치기":"다음 →")));
-  setTimeout(()=>pfCount(el,true),0);
-  return el;
+// 스토리 화면은 배경을 한 번만 만들고, 넘길 때는 가운데 장만 부드럽게 바꿈(배경이 다시 시작되며 깜박이지 않게)
+function storyData(){const st=pfStats(pfItems());const active=new Set(S.data.tasks.filter(t=>!isDone(t)&&t.p).map(t=>t.p));return {st,sl:st.n?storySlides(st,active):[]}}
+function storyOpen(){
+  if(document.getElementById("story"))return;const D=storyData();if(!D.sl.length){PF.story=null;return}
+  PF.sd=D;
+  const root=h("div",{class:"story",id:"story",role:"dialog","aria-label":"스토리 모드"},h("div",{class:"au"},h("i"),h("i"),h("i")),h("div",{class:"grain"}),
+    h("button",{class:"icon-btn s-x","aria-label":"닫기 (Esc)",onclick:storyClose},ic("x")),
+    h("div",{class:"s-stage",onclick:e=>{if(!e.target.closest("button,details,a"))storyGo(PF.story+1)}}),
+    h("div",{class:"s-nav"}));
+  document.body.append(root);storyGo(PF.story||0,true);
+}
+function storyClose(){PF.story=null;PF.sd=null;const r=document.getElementById("story");if(r){r.classList.add("bye");setTimeout(()=>r.remove(),260)}}
+function storyGo(n,first){
+  const root=document.getElementById("story");if(!root||!PF.sd)return;const sl=PF.sd.sl;
+  if(n>=sl.length){storyClose();return}n=Math.max(0,n);if(n===PF.story&&!first)return;PF.story=n;
+  const stage=root.querySelector(".s-stage"),old=stage.firstElementChild;
+  const show=()=>{const s=h("div",{class:"s-slide pfw play"},...[].concat(sl[n]()).filter(Boolean));fill(stage,s);pfCount(s,true)};
+  if(old){old.classList.add("out");setTimeout(show,220)}else show();
+  fill(root.querySelector(".s-nav"),h("button",{class:"btn sm",disabled:n===0,onclick:()=>storyGo(n-1)},"← 이전"),
+    h("div",{class:"s-dots"},sl.map((_,k)=>h("button",{class:k===n?"on":"","aria-label":`${k+1}번째 장`,onclick:()=>storyGo(k)}))),
+    h("button",{class:"btn pri sm",onclick:()=>storyGo(n+1)},n===sl.length-1?"마치기":"다음 →"));
 }
 // 예시 데이터용 가짜 기록(같은 값이 나오도록 고정 난수)
 function demoHist(){
@@ -1994,7 +2004,8 @@ function render(){
   const views={today:viewToday,work:viewWork,life:viewLife,news:viewNews,att:viewAtt,pf:viewPf,ham:viewHam,tools:viewTools};
   let content;try{content=(views[S.view]||viewToday)()}catch(e){console.error(e);content=h("div",{class:"banner"},"이 화면을 그리는 중 문제가 생겼습니다: "+e.message)}
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
-  fill(layer,...[storyLayer(),withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
+  if(S.view!=="pf"&&PF.story!=null)storyClose();
+  fill(layer,...[withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
   renderSync();musicUI();restore();
   function restore(){if(!aeId)return;const el=document.getElementById(aeId);if(el&&el!==document.activeElement){el.focus();try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
@@ -2014,8 +2025,8 @@ function toast(msg,cls){clearTimeout(toastT);document.querySelectorAll(".toast")
 
 /* 키보드 */
 document.addEventListener("keydown",e=>{
-  if(PF.story!=null&&S.view==="pf"){const k=e.key;if(k==="Escape"){PF.story=null;render();e.preventDefault();return}
-    if(k==="ArrowRight"||k===" "||k==="PageDown"){PF.story++;render();e.preventDefault();return}if(k==="ArrowLeft"||k==="PageUp"){PF.story=Math.max(0,PF.story-1);render();e.preventDefault();return}}
+  if(PF.story!=null&&document.getElementById("story")){const k=e.key;if(k==="Escape"){storyClose();e.preventDefault();return}
+    if(k==="ArrowRight"||k===" "||k==="PageDown"){storyGo(PF.story+1);e.preventDefault();return}if(k==="ArrowLeft"||k==="PageUp"){storyGo(PF.story-1);e.preventDefault();return}}
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();S.palette?(S.palette=null,render()):openPalette();return}
   if(e.key==="Escape"){if(S.quick){S.quick=false;render()}else if(S.diag){S.diag=null;render()}else if(S.palette){S.palette=null;render()}else if(S.sel){closeSheet()}else if(typing)document.activeElement.blur();return}
