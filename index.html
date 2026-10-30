@@ -372,10 +372,10 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .dlist .bar{grid-column:2/-1;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
 .dlist .bar i{display:block;height:100%;border-radius:2px;transform-origin:left}
 .pfw.play .dlist .bar i{animation:sweep 1s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(700ms + var(--i)*90ms)}
-.r-sweep{transform-origin:120px 120px;animation:spin 5s linear infinite}
-.r-glow{stroke-opacity:.55;animation:rpulse 3.2s ease-in-out infinite}@keyframes rpulse{50%{stroke-opacity:.12}}
-.r-halo{transform-box:fill-box;transform-origin:center;animation:halo 2.6s ease-out infinite;animation-delay:calc(var(--i)*.32s)}
-@keyframes halo{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.4);opacity:0}}
+.r-glow{stroke-opacity:.45;animation:rpulse 5s ease-in-out infinite}@keyframes rpulse{50%{stroke-opacity:.15}}
+.r-halo{opacity:0;transform-box:fill-box;transform-origin:center}
+.r-pt:hover .r-halo{animation:halo 1.4s ease-out infinite}
+@keyframes halo{0%{transform:scale(1);opacity:.6}100%{transform:scale(3);opacity:0}}
 .r-lab{transition:fill .2s}.r-lab.on{fill:#fff;font-weight:700}
 .r-pt circle:last-child{transition:r .2s}.r-pt:hover circle:last-child{r:6.5}
 .pfw.play .r-pt{animation:pfpop .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(1.2s + var(--i)*90ms);transform-box:fill-box;transform-origin:center}
@@ -1231,7 +1231,7 @@ function radar(byT,size){
       <linearGradient id="rsw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#64d2ff" stop-opacity="0"/><stop offset="1" stop-color="#64d2ff" stop-opacity=".35"/></linearGradient>
       <clipPath id="rclip"><circle cx="${c}" cy="${c}" r="${R}"/></clipPath><filter id="rglow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.5"/></filter></defs>
     ${[.25,.5,.75,1].map(ring).join("")}${VZK.map((_,i)=>{const [x,y]=pt(i,R);return `<line x1="${c}" y1="${c}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.06)"/>`}).join("")}
-    <g clip-path="url(#rclip)"><g class="r-sweep"><path d="M${c},${c} L${c+R},${c} A${R},${R} 0 0,0 ${(c+R*Math.cos(-.9)).toFixed(1)},${(c+R*Math.sin(-.9)).toFixed(1)} Z" fill="url(#rsw)"/><line x1="${c}" y1="${c}" x2="${c+R}" y2="${c}" stroke="#64d2ff" stroke-opacity=".7" stroke-width="1.2"/></g></g>
+    
     <g class="poly"><polygon class="r-glow" points="${poly}" fill="none" stroke="#5b9cf0" stroke-width="5" filter="url(#rglow)"/>
       <polygon class="r-area" points="${poly}" fill="url(#rg)" stroke="#5b9cf0" stroke-width="2" stroke-linejoin="round"/>
       ${vals.map((v,i)=>`<g class="r-pt" data-i="${i}" style="--i:${i}"><circle class="r-halo" cx="${v[0].toFixed(1)}" cy="${v[1].toFixed(1)}" r="4" fill="${VZ[VZK[i]]}"/><circle cx="${v[0].toFixed(1)}" cy="${v[1].toFixed(1)}" r="4" fill="${VZ[VZK[i]]}" stroke="#1c1c1e" stroke-width="2" data-tip="${VZK[i]} · ${byT[VZK[i]]||0}건"/></g>`).join("")}</g>${lab}</svg>`});
