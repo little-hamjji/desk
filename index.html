@@ -387,6 +387,33 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .pfw.play .f-reveal{animation:sweep 1.9s cubic-bezier(.45,.05,.2,1) both .3s;transform-box:fill-box;transform-origin:left}
 .pfw.play .f-line{stroke-dasharray:1;animation:dash 2s cubic-bezier(.45,.05,.2,1) both .3s}@keyframes dash{from{stroke-dashoffset:1}}
 .pfw.play .f-dot,.pfw.play .f-tot{animation:pfpop .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(.45s + var(--i)*200ms);transform-box:fill-box;transform-origin:center}
+/* 일별 업무 밀도(월별) */
+.hm{display:grid;gap:12px}
+.hm-top{display:flex;align-items:center;gap:10px}
+.hm-arr{width:32px;height:32px;border-radius:50%;font-size:20px;line-height:1;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.12)}
+.hm-arr:hover:not(:disabled){background:rgba(10,132,255,.25);border-color:rgba(10,132,255,.5)}.hm-arr:disabled{opacity:.25}
+.hm-ttl{flex:1;display:grid;justify-items:center}.hm-ttl b{font-size:16px}.hm-ttl span{font-size:12px;color:var(--fg2)}
+.hm-dots{display:flex;justify-content:center;gap:6px}.hm-dots button{width:7px;height:7px;padding:0;border:0;border-radius:4px;background:rgba(255,255,255,.2);transition:width .25s,background .25s}
+.hm-dots button.on{width:22px;background:#5b9cf0}
+.hm-body{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.hm-body.in-r{animation:hmR .45s cubic-bezier(.2,.8,.2,1)}.hm-body.in-l{animation:hmL .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes hmR{from{opacity:0;transform:translateX(40px)}}@keyframes hmL{from{opacity:0;transform:translateX(-40px)}}
+.hm-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;max-width:460px;width:100%;justify-self:center}
+.hm-w{font-size:10.5px;color:var(--fg3);text-align:center;padding-bottom:2px}
+.hm-d{aspect-ratio:1;border:0;border-radius:8px;background:var(--bg);position:relative;display:grid;place-items:center;color:rgba(235,235,245,.75);font:500 11.5px var(--num);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.hm-d:disabled{cursor:default;color:var(--fg3)}.hm-d.we span{color:var(--fg3)}
+.hm-d b{position:absolute;right:5px;bottom:3px;font:700 9.5px var(--num);color:#fff;opacity:.85}
+.hm-d:not(:disabled):hover{transform:scale(1.08);box-shadow:0 0 0 1px rgba(255,255,255,.5)}
+.hm-d.on{box-shadow:0 0 0 2px #fff,0 0 18px rgba(91,156,240,.7)}.hm-d.td{outline:1px dashed rgba(255,255,255,.5);outline-offset:1px}
+.pfw.play .hm-d{animation:pfpop .4s ease both;animation-delay:calc(400ms + var(--i)*18ms)}
+.hm-thread{display:grid;gap:8px;align-content:start;max-height:330px;overflow:auto}
+.hm-th{display:flex;align-items:baseline;gap:8px}.hm-th b{font-size:14px}.hm-th span{font-size:12px;color:var(--fg2)}
+.hm-thread ol{list-style:none;margin:0;padding:0 0 0 14px;border-left:1.5px solid rgba(255,255,255,.12);display:grid;gap:10px}
+.hm-thread li{position:relative;animation:rise .4s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*60ms)}
+.hm-thread li::before{content:"";position:absolute;left:-19.5px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px var(--card),0 0 10px var(--c)}
+.hm-thread li p{margin:0;font-size:13px;line-height:1.45}
+.hm-thread .meta{display:flex;gap:8px;font-size:11px;color:var(--fg3);margin-top:2px}.hm-thread .hi{color:#ff6961}
+@media (max-width:760px){.hm-body{grid-template-columns:1fr}}
 /* 스토리 모드 */
 .story{position:fixed;inset:0;z-index:60;background:#06060a;display:grid;grid-template-rows:minmax(0,1fr) auto;color:var(--fg);overflow:hidden;isolation:isolate}
 .story .au{inset:-20%;opacity:.38}
@@ -1291,6 +1318,32 @@ function heat(st){
     cells.push(h("i",{style:`background:${HEAT[lv]};--i:${Math.floor(i/7)}`,"data-tip":`${d.getMonth()+1}월 ${d.getDate()}일 · ${n?n+"건":"기록 없음"}`}))}
   return h("div",{class:"heat-wrap"},h("div",{class:"heat-days"},["월","","수","","금","",""].map(x=>h("span",null,x))),h("div",{class:"heat"},cells));
 }
+// 일별 업무 밀도: 한 달씩 ‹ › 로 넘기고, 날짜를 누르면 그날 한 일이 아래에 이어서 보임
+function heatMonth(st,items){
+  const ms=st.months;if(!ms.length)return null;
+  if(!ms.includes(PF.hm))PF.hm=ms[ms.length-1];
+  const mi=ms.indexOf(PF.hm),mk=PF.hm,[y,m]=mk.split("-").map(Number);
+  const days=items.filter(t=>t.day.startsWith(mk)),byD={};days.forEach(t=>(byD[t.day]=byD[t.day]||[]).push(t));
+  if(!PF.hd||!PF.hd.startsWith(mk))PF.hd=Object.keys(byD).sort((a,b)=>byD[b].length-byD[a].length||(a<b?-1:1))[0]||null;
+  const go=d=>{const n=mi+d;if(n<0||n>=ms.length)return;PF.hm=ms[n];PF.hd=null;PF.hmDir=d;render()};
+  const first=new Date(y,m-1,1),lead=(first.getDay()+6)%7,nd=new Date(y,m,0).getDate(),today=TODAY();
+  const cells=[];for(let i=0;i<lead;i++)cells.push(h("span",{class:"hm-pad"}));
+  for(let d=1;d<=nd;d++){const k=`${mk}-${pad(d)}`,n=(byD[k]||[]).length,lv=!n?0:n<2?1:n<4?2:n<6?3:4,dow=(lead+d-1)%7;
+    cells.push(h("button",{class:"hm-d"+(k===PF.hd?" on":"")+(k===today?" td":"")+(dow>4?" we":""),style:`--bg:${HEAT[lv]};--i:${d}`,"data-tip":`${m}월 ${d}일 · ${n?n+"건":"기록 없음"}`,disabled:!n,onclick:()=>{PF.hd=k;render()}},h("span",null,d),n?h("b",null,n):null))}
+  const dir=PF.hmDir;PF.hmDir=0;
+  const sel=PF.hd?byD[PF.hd]||[]:[];
+  return h("div",{class:"hm"},
+    h("div",{class:"hm-top"},h("button",{class:"icon-btn hm-arr","aria-label":"이전 달",disabled:mi===0,onclick:()=>go(-1)},"‹"),
+      h("div",{class:"hm-ttl"},h("b",null,`${y}년 ${m}월`),h("span",null,`${days.length}건 · ${Object.keys(byD).length}일 활동`)),
+      h("button",{class:"icon-btn hm-arr","aria-label":"다음 달",disabled:mi===ms.length-1,onclick:()=>go(1)},"›")),
+    h("div",{class:"hm-dots"},ms.map((x,i)=>h("button",{class:i===mi?"on":"","aria-label":`${+x.slice(5)}월`,title:`${+x.slice(5)}월`,onclick:()=>{if(i!==mi){PF.hmDir=i>mi?1:-1;PF.hm=x;PF.hd=null;render()}}}))),
+    h("div",{class:"hm-body"+(dir>0?" in-r":dir<0?" in-l":"")},
+      h("div",{class:"hm-cal"},["월","화","수","목","금","토","일"].map(x=>h("span",{class:"hm-w"},x)),cells),
+      h("div",{class:"hm-thread"},PF.hd?[h("div",{class:"hm-th"},h("b",null,fmtMD(PF.hd)),h("span",null,sel.length+"건")),
+        h("ol",null,sel.map((t,i)=>h("li",{style:`--c:${PCOL[t.p]||"var(--gray)"};--i:${i}`},h("p",null,t.t),h("div",{class:"meta"},t.p?h("span",null,t.p):null,t.y?h("span",null,t.y):null,t.r==="상"?h("span",{class:"hi"},"중요"):null))))]
+        :h("div",{class:"faint",style:"font-size:12.5px;padding:8px"},"이 달은 기록이 없습니다"))),
+    h("div",{class:"legend"},"적음",HEAT.map(c=>h("i",{style:`background:${c}`})),"많음 · 날짜를 누르면 그날 한 일"));
+}
 function gantt(st,active){
   const ps=Object.values(st.byP).sort((a,b)=>a.first<b.first?-1:a.first>b.first?1:b.n-a.n);
   const t0=new Date(st.months[0]+"-01T00:00:00").getTime(),t1=new Date(TODAY()+"T00:00:00").getTime()+864e5,span=Math.max(864e5,t1-t0);
@@ -1331,8 +1384,7 @@ function viewPf(){
     h("details",null,h("summary",{class:"faint",style:"font-size:12px;cursor:pointer"},"표로 보기"),monthTable(st)));
   const ganttCard=card("프로젝트 타임라인",{count:`진행 중 ${liveN} · 완료 ${Object.keys(st.byP).length-liveN}`},gantt(st,active),
     h("div",{class:"faint",style:"font-size:11.5px"},"남은 할 일이 없는 프로젝트는 「완료」로 바뀌고 사이드바에서 빠집니다."));
-  const heatCard=card("일별 업무 밀도",{count:`${Object.keys(st.byDay).length}일 기록`},heat(st),
-    h("div",{class:"legend"},"적음",HEAT.map(c=>h("i",{style:`background:${c}`})),"많음"));
+  const heatCard=card("일별 업무 밀도",{count:`전체 ${Object.keys(st.byDay).length}일 기록 · 월별로 넘겨 보기`},heatMonth(st,items));
   const lines=cvLines(st);
   const cvCard=card("경력기술서 문장",{count:"프로젝트별 자동 정리",right:h("button",{class:"btn ghost sm",onclick:()=>pfCopy(lines.join("\n"),"전체를 복사했습니다")},"전체 복사")},
     h("div",{class:"cv"},lines.map(l=>h("div",null,h("span",null,l),h("button",{class:"btn ghost sm",onclick:()=>pfCopy(l)},"복사")))));
