@@ -389,9 +389,18 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .pfw.play .f-dot,.pfw.play .f-tot{animation:pfpop .45s cubic-bezier(.2,1.4,.4,1) both;animation-delay:calc(.45s + var(--i)*200ms);transform-box:fill-box;transform-origin:center}
 /* 이카운트 결재현황 */
 .appr{display:grid;gap:6px}
-.appr-r{border:.5px solid var(--line);border-radius:10px;background:rgba(0,0,0,.16);padding:8px 10px;display:grid;gap:5px}
-.appr-r.on{border-color:rgba(10,132,255,.5)}
-.appr-h{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;background:none;border:0;padding:0;text-align:left;cursor:pointer;color:inherit}
+.appr-r{border:.5px solid var(--line);border-radius:10px;background:rgba(0,0,0,.16);padding:8px 10px;display:grid;gap:5px;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%}
+.appr-r:hover{background:rgba(255,255,255,.05);border-color:rgba(10,132,255,.45)}
+.appr-pop{width:min(640px,100%);max-height:80vh;overflow:auto;background:rgba(36,36,38,.97);border:.5px solid rgba(255,255,255,.16);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px 20px;display:grid;gap:14px;animation:rise .3s cubic-bezier(.2,.8,.2,1)}
+.appr-pop header{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}.appr-pop h3{margin:2px 0 0;font-size:16px;line-height:1.45}
+.appr-pop footer{display:flex;gap:8px;justify-content:flex-end}
+.appr-line{list-style:none;margin:0;padding:0 0 0 16px;border-left:2px solid rgba(255,255,255,.12);display:grid;gap:10px}
+.appr-line li{position:relative;display:flex;gap:10px;align-items:baseline;font-size:13px}
+.appr-line li::before{content:"";position:absolute;left:-22px;top:4px;width:10px;height:10px;border-radius:50%;background:#3a3a3c;box-shadow:0 0 0 3px rgba(36,36,38,1)}
+.appr-line li.ok::before{background:#30d158}.appr-line li.now::before{background:#0a84ff;box-shadow:0 0 0 3px rgba(36,36,38,1),0 0 12px #0a84ff}
+.appr-line li span{color:var(--fg2);font-size:12px}.appr-line li.now span{color:#409cff;font-weight:700}
+.appr-txt{white-space:pre-wrap;font-size:12.5px;line-height:1.65;max-height:320px;overflow:auto;color:var(--fg)}
+.appr-h{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
 .appr-h .tt{font-size:12.8px;line-height:1.45}.appr-h .pill{flex:none}
 .appr-steps{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11.5px;color:var(--fg3)}
 .appr-steps span{padding:1px 7px;border-radius:9px;background:rgba(255,255,255,.05)}
@@ -1685,19 +1694,23 @@ function hkStatus(){(async()=>{
     const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
     const big=[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);big.querySelectorAll(".label").forEach(x=>x.remove());
     const title=big.innerText.trim().replace(/\s+/g," "),st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();
-    const steps=[],a=[...tr.querySelectorAll("a")].find(x=>x.innerText.trim()==="보기");
+    const steps=[],a=[...tr.querySelectorAll("a")].find(x=>x.innerText.trim()==="보기");let detail="",files=[],amt="";
     if(a){a.click();let boxes=[];for(let k=0;k<24&&!boxes.length;k++){await sleep(250);boxes=[...document.querySelectorAll("table")].filter(t=>t.offsetParent&&/^결\s*재/.test(t.innerText.trim())&&t.innerText.length<300)}
       boxes.forEach(t=>{const trs=[...t.querySelectorAll("tr")];if(trs.length<3)return;const roles=[...trs[0].children].slice(1).map(x=>x.innerText.trim().replace(/\s+/g,""));const ds=[...trs[trs.length-1].children].map(x=>x.innerText.trim());
         roles.forEach((r,j)=>{const m=(ds[j]||"").match(/\d{4}\/\d{2}\/\d{2}/),d=m?m[0]:"",p=steps[steps.length-1];if(p&&p.r===r){if(!p.d)p.d=d}else steps.push({r,d})})});
+      // 문서 내용(기안번호부터 본문 끝까지)과 첨부 파일 이름도 함께 담기
+      if(boxes[0]){let el=boxes[0];while(el.parentElement&&!/기안번호/.test(el.innerText))el=el.parentElement;let tx=(el.innerText||"").replace(/\n{3,}/g,"\n\n");
+        const i=tx.indexOf("기안번호"),j=tx.search(/\n(검토완료|첨언|반려문서보기)\n/);tx=tx.slice(Math.max(0,i),j>i?j:i+4000).slice(0,4000);
+        detail=tx;files=[...new Set((tx.match(/[^\n]+\.(pdf|xlsx?|hwpx?|docx?|zip|jpe?g|png)/gi)||[]).map(s=>s.trim()))].slice(0,12);amt=((tx.match(/총합계\s*([\d,]+)/)||[])[1]||"")}
       const open=()=>[...document.querySelectorAll("table")].some(t=>t.offsetParent&&/^결\s*재/.test(t.innerText.trim()));
       for(let k=0;k<6&&open();k++){const cl=[...document.querySelectorAll("button")].filter(b=>b.offsetParent&&b.innerText.trim()==="닫기");if(cl.length)cl[cl.length-1].click();await sleep(600)}}
-    out.push({no,title,st,steps})}
+    out.push({no,title,st,steps,amt,files,detail})}
   const tj=Array.prototype.toJSON;delete Array.prototype.toJSON;const txt=JSON.stringify({hamkkun:"appr",v:2,at:new Date().toISOString(),rows:out});if(tj)Array.prototype.toJSON=tj;
   try{await navigator.clipboard.writeText(txt);say(out.length+"건의 결재 단계를 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요.")}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
 })()}
 const bmk=fn=>"javascript:"+encodeURIComponent("("+fn.toString()+")()");
 const apprFix=d=>{if(d&&typeof d.rows==="string"){try{d.rows=JSON.parse(d.rows)}catch(e){d.rows=[]}}if(d&&!Array.isArray(d.rows))d.rows=[];return d};
-S.appr=apprFix(ls.get("desk:appr",null));S.apprOpen=null;
+S.appr=apprFix(ls.get("desk:appr",null));S.apprPop=null;
 // 결재 단계로 지금 상태 판단: 반려 / 결재 완료 / ○○ 대기(3일 넘게 멈추면 확인 필요)
 function apprState(r){
   if(r.st==="반려")return {t:"반려",c:"red"};
@@ -1719,12 +1732,26 @@ function apprCard(){
       h("a",{class:"btn go",href:bmk(hkFill),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 채우기"),
       h("a",{class:"btn pri",href:bmk(hkStatus),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 결재현황"),
       h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기")),
-    rows.length?h("div",{class:"appr"},rows.slice(0,20).map(r=>{const s=apprState(r),open=S.apprOpen===r.no;
-      return h("div",{class:"appr-r"+(open?" on":"")},
-        h("button",{class:"appr-h",onclick:()=>{S.apprOpen=open?null:r.no;render()}},h("span",{class:"tt"},r.title),h("span",{class:"pill "+s.c},s.t)),
-        r.steps&&r.steps.length?h("div",{class:"appr-steps"},r.steps.map((x,i)=>[i?h("i",null,"→"):null,h("span",{class:x.d?"ok":(r.steps.findIndex(y=>!y.d)===i?"now":"")},x.r,x.d?" ✓"+md(x.d):r.steps.findIndex(y=>!y.d)===i?" ⏳":"")])):null,
-        open?h("div",{class:"appr-d"},h("span",{class:"faint"},"기안번호 "+r.no),h("button",{class:"btn ghost sm",onclick:()=>pfCopy(r.no,"기안번호를 복사했습니다 · 이카운트 내결재관리 검색칸에 붙여넣으세요")},"번호 복사")):null)})):
+    A&&!(A.v>=2)?h("div",{class:"banner"},"이 결재현황은 예전 버튼으로 가져와서 결재 단계가 없습니다. 즐겨찾기의 「🐹 햄꾼 결재현황」을 지우고 위 파란 버튼을 다시 끌어다 놓은 뒤, 이카운트 「내결재관리 → 진행중」에서 다시 눌러 주세요."):null,
+    rows.length?h("div",{class:"appr"},rows.slice(0,20).map(r=>{const s=apprState(r);
+      return h("button",{class:"appr-r",onclick:()=>{S.apprPop=r.no;render()}},
+        h("div",{class:"appr-h"},h("span",{class:"tt"},r.title),h("span",{class:"pill "+s.c},s.t)),
+        r.steps&&r.steps.length?h("div",{class:"appr-steps"},r.steps.map((x,i)=>[i?h("i",null,"→"):null,h("span",{class:x.d?"ok":(r.steps.findIndex(y=>!y.d)===i?"now":"")},x.r,x.d?" ✓"+md(x.d):r.steps.findIndex(y=>!y.d)===i?" ⏳":"")])):null)})):
       h("div",{class:"faint",style:"font-size:12px"},"아직 불러온 결재현황이 없습니다."));
+}
+// 기안을 누르면 뜨는 세부 내용 팝업
+function apprModal(){
+  const A=S.appr;if(!S.apprPop||!A)return null;const r=(A.rows||[]).find(x=>x.no===S.apprPop);if(!r){S.apprPop=null;return null}
+  const s=apprState(r),close=()=>{S.apprPop=null;render()},wi=(r.steps||[]).findIndex(y=>!y.d);
+  return h("div",{class:"veil",onclick:e=>{if(e.target===e.currentTarget)close()}},
+    h("div",{class:"appr-pop",role:"dialog","aria-label":"기안 세부 내용"},
+      h("header",null,h("div",null,h("small",{class:"faint"},"기안번호 "+r.no),h("h3",null,r.title)),h("button",{class:"icon-btn","aria-label":"닫기",onclick:close},ic("x"))),
+      h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},h("span",{class:"pill "+s.c},s.t),r.amt?h("span",{class:"pill"},"총 "+r.amt+"원"):null),
+      r.steps&&r.steps.length?h("ol",{class:"appr-line"},r.steps.map((x,i)=>h("li",{class:x.d?"ok":i===wi?"now":""},h("b",null,x.r),h("span",null,x.d?x.d.replace(/\//g,". ")+" 결재":i===wi?"지금 결재 대기":"예정")))):
+        h("div",{class:"faint",style:"font-size:12.5px"},"결재 단계 정보가 없습니다. 새 「🐹 햄꾼 결재현황」 버튼으로 다시 불러와 주세요."),
+      r.files&&r.files.length?h("div",{class:"field"},h("label",null,"첨부"),h("div",{class:"chips"},r.files.map(f=>h("span",{class:"chip",style:"cursor:default"},"📎 "+f)))):null,
+      r.detail?h("div",{class:"field"},h("label",null,"문서 내용"),h("div",{class:"note appr-txt"},r.detail)):null,
+      h("footer",null,h("button",{class:"btn",onclick:()=>pfCopy(r.no,"기안번호를 복사했습니다 · 이카운트 내결재관리 검색칸에 붙여넣으세요")},"기안번호 복사"),h("button",{class:"btn pri",onclick:close},"닫기"))));
 }
 function jobSheet(){
   const j=byId(S.data.jobs,S.sel.id);if(!j){S.sel=null;return null}
@@ -2205,7 +2232,7 @@ function render(){
   let content;try{content=(views[S.view]||viewToday)()}catch(e){console.error(e);content=h("div",{class:"banner"},"이 화면을 그리는 중 문제가 생겼습니다: "+e.message)}
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
   if(S.view!=="pf"&&PF.story!=null)storyClose();
-  fill(layer,...[withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
+  fill(layer,...[apprModal(),withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
   renderSync();musicUI();restore();
   function restore(){if(!aeId)return;const el=document.getElementById(aeId);if(el&&el!==document.activeElement){el.focus();try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
@@ -2225,6 +2252,7 @@ function toast(msg,cls){clearTimeout(toastT);document.querySelectorAll(".toast")
 
 /* 키보드 */
 document.addEventListener("keydown",e=>{
+  if(S.apprPop&&e.key==="Escape"){S.apprPop=null;render();e.preventDefault();return}
   if(PF.story!=null&&document.getElementById("story")){const k=e.key;if(k==="Escape"){storyClose();e.preventDefault();return}
     if(k==="ArrowRight"||k===" "||k==="PageDown"){storyGo(PF.story+1);e.preventDefault();return}if(k==="ArrowLeft"||k==="PageUp"){storyGo(PF.story-1);e.preventDefault();return}}
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
