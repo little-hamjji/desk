@@ -795,7 +795,7 @@ const hrs=n=>n==null?"–":(Math.round(n*10)/10).toLocaleString("ko-KR")+"h";
 const agoTxt=iso=>{if(!iso)return"";const m=Math.round((Date.now()-Date.parse(iso))/6e4);return m<1?"방금":m<60?`${m}분 전`:m<1440?`${Math.round(m/60)}시간 전`:`${Math.round(m/1440)}일 전`};
 
 /* 노션 선택지 */
-const PROJECTS=["성과공유회","모두의 멘토링","1차년도 연차평가","2차년도 심사·조정","운영위원회","1차년도 종료·정산","멘토 감사장","일상 운영"];
+const PROJECTS=["성과공유회","모두의 멘토링","1차년도 연차평가","2차년도 심사·조정","운영위원회","1차년도 종료·정산","멘토 감사장","일상 운영","모두의 아카데미","모두의 레터"];
 const TYPES=["예산·회계","행정·공문","평가·심사","멘토링 운영","행사 기획·운영","기관 관리","홍보·콘텐츠","업무 자동화·도구"];
 const STATUS=["시작 전","진행 중","대기","완료"];
 const STAGES=["관심","서류 준비","지원 완료","면접","합격","불합격","보류"];
@@ -810,6 +810,7 @@ const S={
   f:{q:"",p:"",y:"",mode:"list"}, sync:{busy:false,err:null}, addDay:null, palette:null,
 };
 const VIEWS=[["today","대시보드","today"],["work","업무","work"],["life","일상","life"],["news","브리핑","news"],["att","근태·수당","att"],["pf","포트폴리오","star"],["ham","햄꾼","ham"],["tools","도구","tools"]];
+const PVIEWS=[["acct","회계·행정 업무","att","var(--green)"],["letter","모두의 레터","news","var(--mint)"]]; // 사이드바 「프로젝트」에 고정
 
 /* ═════════ 서버 ═════════ */
 // which: 생략=개인 계정(노션·캘린더·개인 메일), "work"=회사 계정(chlee@hamkke.org 메일·캘린더)
@@ -1235,7 +1236,7 @@ function pfLoad(force){
   if(PF.loading||(PF.hist&&!PF.hist.demo&&!force&&Date.now()-(PF.hist.at||0)<6*3600e3))return;
   PF.loading=true;
   api("history",{}).then(r=>{PF.hist={at:Date.now(),items:r};PF.err=null;PF.replay=true;ls.set("desk:hist",PF.hist)})
-    .catch(e=>{PF.err=e.message}).finally(()=>{PF.loading=false;if(S.view==="pf")render()});
+    .catch(e=>{PF.err=e.message}).finally(()=>{PF.loading=false;if(/^(pf|acct|letter)$/.test(S.view))render()});
 }
 function pfItems(){
   const m=new Map();((PF.hist&&PF.hist.items)||[]).forEach(t=>m.set(t.id,t));
@@ -1523,8 +1524,36 @@ function viewTools(){
   const links=card("바로가기",{icon:"ext"},h("div",{class:"chips"},
     [["노션 원데이터","https://app.notion.com/p/408d0752db638193a4c5ef39a90e2199"],["구글 캘린더","https://calendar.google.com"],["Gmail","https://mail.google.com"],["구글 드라이브","https://drive.google.com"],["유튜브 뮤직","https://music.youtube.com"]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))));
-  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},apprCard(),cashCard()),h("div",{class:"grid g2"},dday,links)];
+  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},dday,links)];
 }
+
+/* ═════════ 회계·행정 · 모두의 레터 ═════════ */
+// 노션 업무 유형은 포트폴리오용으로 그대로 두고, 화면에서만 회계+행정을 묶음
+const ACCT_Y={all:["예산·회계","행정·공문"],acct:["예산·회계"],admin:["행정·공문"]};
+let pjFresh=false;S.af=ls.get("desk:af","all");S.pjMore=40;
+// 60일 넘은 완료 업무는 포트폴리오의 전체 기록에서 가져옴(이 기록은 세부 창이 없어 읽기만)
+function allTasks(){
+  if(!pjFresh){pjFresh=true;pfLoad(true)}else if(!PF.err)pfLoad();
+  const m=new Map();((PF.hist&&PF.hist.items)||[]).forEach(t=>m.set(t.id,Object.assign({old:true},t)));
+  S.data.tasks.forEach(t=>m.set(t.id,t));return [...m.values()];
+}
+const oldRow=t=>h("div",{class:"task done"},h("span",{class:"ck on",html:CHECK}),h("div",{class:"body"},h("span",{class:"tt"},t.t||"(제목 없음)"),h("div",{class:"meta"},ptag(t.p),t.y?h("span",null,t.y):null)),h("span"));
+function pjBody(list){
+  const today=TODAY(),mon=today.slice(0,7),open=list.filter(t=>!isDone(t)).sort((a,b)=>(a.d||"9")<(b.d||"9")?-1:1);
+  const done=list.filter(isDone).sort((a,b)=>(b.d||"")<(a.d||"")?-1:1),late=open.filter(t=>t.d&&dOf(t.d)<today).length;
+  const byM={};done.slice(0,S.pjMore).forEach(t=>{const k=t.d?dOf(t.d).slice(0,7):"날짜 없음";(byM[k]=byM[k]||[]).push(t)});
+  return [h("div",{class:"kpis"},kpi("남은 일",open.length,"건",late?`밀린 일 ${late}건`:""),kpi("이번 달 완료",done.filter(t=>dOf(t.d).startsWith(mon)).length,"건",""),kpi("전체 완료",done.length,"건",PF.loading?"기록 불러오는 중…":"")),
+    h("div",{class:"grid g2"},
+      card("남은 일",{count:open.length+"건"},open.length?h("div",{class:"list"},open.map(t=>taskRow(t,{type:true}))):h("div",{class:"empty"},"남은 일이 없습니다")),
+      card("완료 기록",{count:done.length+"건"},Object.keys(byM).map(k=>h("div",null,h("div",{class:"sec-t"},k==="날짜 없음"?k:`${+k.slice(0,4)}년 ${+k.slice(5)}월`),h("div",{class:"list"},byM[k].map(t=>t.old?oldRow(t):taskRow(t,{type:true,noDate:false}))))),
+        done.length>S.pjMore?h("button",{class:"btn ghost",onclick:()=>{S.pjMore+=60;render()}},"더 보기"):null,!done.length?h("div",{class:"empty"},"완료 기록이 없습니다"):null))];
+}
+function viewAcct(){
+  const y=ACCT_Y[S.af]||ACCT_Y.all;
+  return [h("div",{class:"row"},h("div",{class:"seg",role:"group","aria-label":"구분"},[["all","전체"],["acct","회계"],["admin","행정·공문"]].map(([k,n])=>h("button",{"aria-pressed":String(S.af===k),onclick:()=>{S.af=k;ls.set("desk:af",k);render()}},n)))),
+    ...pjBody(allTasks().filter(t=>y.includes(t.y))),h("div",{class:"grid g2"},apprCard(),cashCard())];
+}
+function viewLetter(){return pjBody(allTasks().filter(t=>t.p==="모두의 레터"))}
 function tmParse(v){v=String(v).trim().replace(/분|min/g,"");let m=v.match(/^(\d{1,3}):(\d{1,2})$/);if(m)return (+m[1]*60+ +m[2])||null;m=v.match(/^(\d{1,3})$/);return m&&+m[1]>0?+m[1]*60:null}
 
 /* 바탕화면 알림(윈도우 알림 창) — 타이머 종료·일정 10분 전 */
@@ -1874,7 +1903,7 @@ function openPalette(){S.palette={q:"",i:0};render();setTimeout(()=>{const el=$(
 function paletteItems(q){
   const L=q.trim().toLowerCase(),out=[];
   const cmds=[["새 할 일",()=>{S.view="today";S.qmode="task";render();setTimeout(()=>$("#q-main")&&$("#q-main").focus(),0)}],["새 메모",()=>{S.view="today";S.qmode="memo";render();setTimeout(()=>$("#q-main")&&$("#q-main").focus(),0)}],
-    ["집중 타이머 시작",()=>{S.view="tools";tmStart()}],["노션 새로고침",()=>refresh()],...VIEWS.map(([k,n])=>[`${n} 화면으로`,()=>{S.view=k;render()}])];
+    ["집중 타이머 시작",()=>{S.view="tools";tmStart()}],["노션 새로고침",()=>refresh()],...[...VIEWS,...PVIEWS].map(([k,n])=>[`${n} 화면으로`,()=>{S.view=k;render()}])];
   cmds.forEach(([n,fn])=>{if(!L||n.toLowerCase().includes(L))out.push({n,sub:"명령",fn})});
   if(L&&S.data){
     S.data.tasks.filter(t=>(t.t+" "+(t.detail||"")).toLowerCase().includes(L)).slice(0,12).forEach(t=>out.push({n:t.t,sub:(isDone(t)?"완료 · ":"")+(t.d?fmtMD(dOf(t.d)):"할 일"),fn:()=>openSheet("tasks",t.id)}));
@@ -2311,7 +2340,8 @@ function lock(){ls.del("desk:cfg");ls.del("desk:cache");S.cfg=null;S.data=null;S
 function navCounts(){if(!S.data)return{};const today=TODAY(),open=S.data.tasks.filter(t=>!isDone(t));
   const nb=newsByDay(),nd=Object.keys(nb).sort().reverse()[0];
   return{today:open.filter(t=>t.d&&dOf(t.d)<=today).length,work:open.length,life:(S.data.habits||[]).filter(x=>x.on!==false&&!hDates(x).includes(today)).length||"",pf:S.data.tasks.filter(t=>t.star).length,
-    news:nd===today?nb[nd].length:"",ham:(S.data.logs||[]).filter(l=>!l.ev).length||""}}
+    news:nd===today?nb[nd].length:"",ham:(S.data.logs||[]).filter(l=>!l.ev).length||"",
+    acct:open.filter(t=>ACCT_Y.all.includes(t.y)).length||"",letter:open.filter(t=>t.p==="모두의 레터").length||""}}
 function render(){
   const ae=document.activeElement,aeId=ae&&ae.id,selS=ae&&ae.selectionStart,selE=ae&&ae.selectionEnd;
   const layer=$("#layer");
@@ -2319,10 +2349,11 @@ function render(){
   $("#app").hidden=false;
   const cnt=navCounts();
   fill($("#nav"),h("h6",null,"햄찌스 데스크"),VIEWS.map(([k,n,icn],i)=>h("button",{"aria-current":S.view===k?"page":null,onclick:()=>{S.view=k;ls.set("desk:view",k);S.sel=null;render();$("#scroll").scrollTop=0},title:`${n} (${i+1})`},ic(icn),n,cnt[k]?h("span",{class:"c"},cnt[k]):null)),
-    h("h6",null,"프로젝트"),projStats().filter(o=>o.total>o.done).slice(0,8).map(o=>h("button",{onclick:()=>{S.view="work";S.f.p=o.p;S.f.mode="list";render()}},h("span",{class:"dot",style:`background:${PCOL[o.p]||"var(--gray)"}`}),h("span",{style:"overflow:hidden;text-overflow:ellipsis;white-space:nowrap"},o.p),h("span",{class:"c"},o.total-o.done||""))));
-  fill($("#tabbar"),VIEWS.map(([k,n,icn])=>h("button",{"aria-current":S.view===k?"page":null,onclick:()=>{S.view=k;ls.set("desk:view",k);render();$("#scroll").scrollTop=0}},ic(icn),n)),
+    h("h6",null,"프로젝트"),PVIEWS.map(([k,n,,col])=>h("button",{"aria-current":S.view===k?"page":null,onclick:()=>{S.view=k;ls.set("desk:view",k);S.sel=null;render();$("#scroll").scrollTop=0}},h("span",{class:"dot",style:`background:${col}`}),h("span",{style:"overflow:hidden;text-overflow:ellipsis;white-space:nowrap"},n),cnt[k]?h("span",{class:"c"},cnt[k]):null)),
+    projStats().filter(o=>o.total>o.done&&o.p!=="모두의 레터").slice(0,8).map(o=>h("button",{onclick:()=>{S.view="work";S.f.p=o.p;S.f.mode="list";render()}},h("span",{class:"dot",style:`background:${PCOL[o.p]||"var(--gray)"}`}),h("span",{style:"overflow:hidden;text-overflow:ellipsis;white-space:nowrap"},o.p),h("span",{class:"c"},o.total-o.done||""))));
+  fill($("#tabbar"),[...VIEWS,...PVIEWS].map(([k,n,icn])=>h("button",{"aria-current":S.view===k?"page":null,onclick:()=>{S.view=k;ls.set("desk:view",k);render();$("#scroll").scrollTop=0}},ic(icn),n)),
     h("button",{onclick:()=>{M.mob=!M.mob;musicUI()},"aria-pressed":String(M.mob)},ic("music"),"음악"));
-  const V=VIEWS.find(v=>v[0]===S.view)||VIEWS[0];
+  const V=[...VIEWS,...PVIEWS].find(v=>v[0]===S.view)||VIEWS[0];
   $("#app").classList.toggle("focus",!!S.focus);
   fill($("#lights"),lightsEl());
   fill($("#toolbar"),S.focus?h("div",{class:"lights"},lightsEl()):null,h("h1",null,V[1]),S.demo?h("span",{class:"pill orange"},"예시 데이터"):null,h("span",{class:"sp"}),
@@ -2330,7 +2361,7 @@ function render(){
     h("button",{class:"search",onclick:openPalette,"aria-label":"검색 (⌘K)"},ic("search"),h("span",null,"검색·명령"),h("kbd",null,"⌘K")),
     h("button",{class:"btn pri",onclick:()=>openQuick("task")},ic("plus"),"새로 만들기"));
   S.enter=S._pv!==S.view;S._pv=S.view;
-  const views={today:viewToday,work:viewWork,life:viewLife,news:viewNews,att:viewAtt,pf:viewPf,ham:viewHam,tools:viewTools};
+  const views={today:viewToday,work:viewWork,life:viewLife,news:viewNews,att:viewAtt,pf:viewPf,ham:viewHam,tools:viewTools,acct:viewAcct,letter:viewLetter};
   let content;try{content=(views[S.view]||viewToday)()}catch(e){console.error(e);content=h("div",{class:"banner"},"이 화면을 그리는 중 문제가 생겼습니다: "+e.message)}
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
   if(S.view!=="pf"&&PF.story!=null)storyClose();
