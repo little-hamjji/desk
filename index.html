@@ -1542,7 +1542,7 @@ function pjBody(list){
   const today=TODAY(),mon=today.slice(0,7),open=list.filter(t=>!isDone(t)).sort((a,b)=>(a.d||"9")<(b.d||"9")?-1:1);
   const done=list.filter(isDone).sort((a,b)=>(b.d||"")<(a.d||"")?-1:1),late=open.filter(t=>t.d&&dOf(t.d)<today).length;
   const byM={};done.slice(0,S.pjMore).forEach(t=>{const k=t.d?dOf(t.d).slice(0,7):"날짜 없음";(byM[k]=byM[k]||[]).push(t)});
-  return [h("div",{class:"kpis"},kpi("남은 일",open.length,"건",late?`밀린 일 ${late}건`:""),kpi("이번 달 완료",done.filter(t=>dOf(t.d).startsWith(mon)).length,"건",""),kpi("전체 완료",done.length,"건",PF.loading?"기록 불러오는 중…":"")),
+  return [h("div",{class:"kpis"},kpi("남은 일",open.length,"건",late?`밀린 일 ${late}건`:""),kpi("이번 달 완료",done.filter(t=>(dOf(t.d)||"").startsWith(mon)).length,"건",""),kpi("전체 완료",done.length,"건",PF.loading?"기록 불러오는 중…":"")),
     h("div",{class:"grid g2"},
       card("남은 일",{count:open.length+"건"},open.length?h("div",{class:"list"},open.map(t=>taskRow(t,{type:true}))):h("div",{class:"empty"},"남은 일이 없습니다")),
       card("완료 기록",{count:done.length+"건"},Object.keys(byM).map(k=>h("div",null,h("div",{class:"sec-t"},k==="날짜 없음"?k:`${+k.slice(0,4)}년 ${+k.slice(5)}월`),h("div",{class:"list"},byM[k].map(t=>t.old?oldRow(t):taskRow(t,{type:true,noDate:false}))))),
