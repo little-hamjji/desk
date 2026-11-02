@@ -418,7 +418,9 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .appr-d{display:flex;gap:8px;align-items:center;font-size:12px}
 /* 현금출납부 → 미작성 지결 */
 .cash{display:grid;gap:6px;max-height:900px;overflow:auto}
-.rail{overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:10px;background:var(--side);border-left:.5px solid var(--line);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
+.rail{overflow:hidden;min-height:0;padding:12px 10px;display:flex;flex-direction:column;gap:10px;background:var(--side);border-left:.5px solid var(--line);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
+#rail{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.rail>.music{flex:none}
 .rail h6{margin:2px 4px;font-size:11.5px;color:var(--fg3);font-weight:600}
 .staff{--c:#ffd60a;display:grid;gap:8px;padding:12px 12px 12px 14px;position:relative;overflow:hidden;cursor:pointer;border-radius:12px;border:.5px solid var(--line);background:rgba(255,255,255,.04);min-width:0;flex:none}
 .staff.jp{--c:#30d158}
@@ -445,7 +447,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .wheel .pad{flex:0 0 22px}
 .wheel button{flex:0 0 22px;border:0;background:transparent;color:var(--fg3);font-size:12.5px;scroll-snap-align:center;cursor:pointer}
 .wheel button.on{color:var(--c);font-weight:700}
-@media(max-width:1180px){.app{grid-template-columns:232px minmax(0,1fr)}.rail{display:none}}
+@media(max-width:1180px){.app{grid-template-columns:232px minmax(0,1fr)}.rail{display:contents}#rail{display:none}.music{position:fixed;right:10px;bottom:10px;width:220px;z-index:21;background:rgba(44,44,46,.92)}}
 
 .bk-l{display:grid;gap:6px}
 .bk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:9px 12px;border:.5px solid var(--line);border-radius:10px;align-items:center}
@@ -782,7 +784,6 @@ tr.cur td{background:rgba(10,132,255,.1)}
     <div class="lights" id="lights"></div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
-      <div class="music" id="music"></div>
       <div class="sync" id="sync"></div>
     </div>
     <div class="tabbar" id="tabbar"></div>
@@ -791,7 +792,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
     <div class="toolbar" id="toolbar"></div>
     <div class="scroll" id="scroll"><div class="page" id="page"></div></div>
   </main>
-  <aside class="rail" id="rail" aria-label="직원 관리"></aside>
+  <aside class="rail" aria-label="직원 관리"><div id="rail"></div><div class="music" id="music"></div></aside>
 </div>
 <div id="layer"></div>
 
@@ -2817,7 +2818,7 @@ document.addEventListener("keydown",e=>{
 setInterval(()=>{const c=$("#clock");if(c){const d=new Date();c.textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}`}renderSync()},15000);
 setInterval(()=>{if(!document.hidden&&!S.sel)refresh(true)},5*60e3);
 // 직원 상태만 1분마다 가볍게 다시 읽음(바뀌었을 때만 오른쪽 패널을 다시 그림)
-setInterval(async()=>{if(document.hidden||!S.data||S.demo)return;try{const x=await api("staffNow",{});if(JSON.stringify(x)!==JSON.stringify(S.data.staff)){S.data.staff=x;if(!document.querySelector("#rail:hover"))fill($("#rail"),railView())}}catch{}},60e3);
+setInterval(async()=>{if(document.hidden||!S.data||S.demo)return;try{const x=await api("staffNow",{});if(JSON.stringify(x)!==JSON.stringify(S.data.staff)){S.data.staff=x;if(!document.querySelector("#rail .wheel:hover"))fill($("#rail"),railView())}}catch{}},60e3);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.data&&!S.demo&&Date.now()-Date.parse(S.data.at||0)>60e3)refresh(true)});
 let lastDay=TODAY();setInterval(()=>{if(TODAY()!==lastDay){lastDay=TODAY();render()}},60e3);
 
