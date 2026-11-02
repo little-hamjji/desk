@@ -28,10 +28,11 @@ const DB = {
   appr:  '6e0e599bc9b2409f9cbe09110028df29', // 이카운트 결재현황
   cash:  '538ee6b62ed74a47b12afbc6396d0cd6', // 출납부 미작성 지결
   bank:  '656b3c146e6c4850b76ef6e0f9301bcd', // 통장 검수
+  doc:   'ee0e7d3d318c46b791449950c8325c67', // 지원 서류
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-02c'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-02d'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -172,6 +173,8 @@ const MAP = {
            files: ['첨부', 'text'], detail: ['문서 내용', 'text'] },
   cash:  { t: ['내역', 'title'], key: ['묶음키', 'text'], sum: ['금액', 'num'], n: ['줄 수', 'num'], from: ['시작일', 'date'], to: ['종료일', 'date'],
            vendors: ['거래처', 'text'], rows: ['출납부 행', 'text'] },
+  doc:   { t: ['서류', 'title'], job: ['지원처', 'rel'], kind: ['종류', 'select'], st: ['상태', 'select'], lim: ['글자 제한', 'num'], o: ['순서', 'num'],
+           body: ['내용', 'text'], memo: ['메모', 'text'], file: ['파일', 'text'] },
   bank:  { t: ['거래', 'title'], k: ['키', 'text'], d: ['거래일', 'date'], out: ['지급', 'num'], in: ['입금', 'num'], bal: ['잔액', 'num'], chk: ['검수', 'select'],
            flags: ['확인 사항', 'text'], led: ['출납부', 'text'], ap: ['지결', 'text'], j: ['연결', 'text'] },
 };
@@ -392,7 +395,7 @@ function scanList() {
 
 function loadNotion(today) {
     const since = addDays(today, -60);
-    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news, apprs, cashes, banks, jpLogs, jpSorries] = queryMany([
+    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news, apprs, cashes, banks, jpLogs, jpSorries, docs] = queryMany([
       { db: DB.tasks, body: { filter: { or: [
         { property: '상태', status: { does_not_equal: '완료' } },
         { property: '날짜', date: { on_or_after: since } },
@@ -412,6 +415,7 @@ function loadNotion(today) {
       { db: DB.bank, body: { filter: { property: '거래일', date: { on_or_after: addDays(today, -200) } } }, max: 1000, opt: '통장 검수' },
       { db: DB.jplog, body: { page_size: 40, sorts: [{ property: '날짜', direction: 'descending' }] }, max: 40, opt: '지피리 업무일지' },
       { db: DB.jpsorry, body: { page_size: 30, sorts: [{ property: '날짜', direction: 'descending' }] }, max: 30, opt: '지피리 시말서' },
+      { db: DB.doc, max: 300, opt: '지원 서류' },
     ]);
     const okDb = n => !WARN.some(w => w.indexOf(n) === 0); // 못 읽은 표는 빈 표로 보내지 않음
     return {
@@ -431,6 +435,7 @@ function loadNotion(today) {
       leave: leave.map(p => read('leave', p)).sort((a, b) => (b.y || '').localeCompare(a.y || '')),
       habits: habits.map(p => read('habit', p)).sort((a, b) => (a.o || 99) - (b.o || 99)),
       memos: memos.map(p => read('memo', p)),
+      docs: okDb('지원 서류') ? docs.map(p => read('doc', p)) : undefined,
       jobs: jobs.map(p => read('job', p)),
     };
 }
@@ -450,7 +455,7 @@ Object.assign(ACTIONS, {
     return read(kind, page);
   },
   trash({ kind, id }) {
-    if (!['tasks', 'memo', 'job', 'habit', 'att', 'appr', 'cash'].includes(kind)) throw new Error('지울 수 없는 종류입니다');
+    if (!['tasks', 'memo', 'job', 'habit', 'att', 'appr', 'cash', 'doc'].includes(kind)) throw new Error('지울 수 없는 종류입니다');
     notion('pages/' + id, 'patch', { archived: true }); // 노션 휴지통으로(30일 안에 복구 가능)
     return { id };
   },

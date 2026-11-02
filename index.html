@@ -1191,7 +1191,7 @@ function jobsCard(){
   const js=S.data.jobs||[],main=STAGES.slice(0,5),rest=STAGES.slice(5);
   const col=st=>dropZone(h("div",{class:"col"},h("header",null,h("span",{class:"tag"},h("i",{style:`background:${SCOL[st]}`}),st),h("span",{class:"faint"},js.filter(j=>(j.st||"관심")===st).length)),
       js.filter(j=>(j.st||"관심")===st).sort((a,b)=>(a.d||"9")<(b.d||"9")?-1:1).map(j=>{const n=j.d?diff(dOf(j.d),TODAY()):null;
-        const el=h("button",{class:"kc",draggable:"true",onclick:()=>openSheet("jobs",j.id)},h("b",null,j.n||"(이름 없음)"),h("span",null,[j.role,j.d?(n<0?`마감 지남`:n===0?"오늘 마감":`D-${n}`):null,jobCk(j).length?`${jobCk(j).length}/${JOB_CK.length}`:null].filter(Boolean).join(" · ")||"—"));
+        const el=h("button",{class:"kc",draggable:"true",onclick:()=>openSheet("jobs",j.id)},h("b",null,j.n||"(이름 없음)"),h("span",null,[j.role,j.d?(n<0?`마감 지남`:n===0?"오늘 마감":`D-${n}`):null,j.st==="서류 준비"?`서류 ${docsOf(j.id).filter(docDone).length}/${docsOf(j.id).length}`:null].filter(Boolean).join(" · ")||"—"));
         el.addEventListener("dragstart",e=>e.dataTransfer.setData("text/job",j.id));return el})),
     id=>{const j=byId(S.data.jobs,id);if(j&&j.st!==st)mutate(D=>{byId(D.jobs,id).st=st},()=>api("update",{kind:"job",id,fields:{st}}),`「${st}」 단계로 옮겼습니다`)},"text/job");
   return card("이직 준비",{icon:"star",count:`진행 ${js.filter(j=>!["합격","불합격","보류"].includes(j.st)).length}곳`,right:h("span",{class:"faint",style:"font-size:11.5px"},"카드를 끌어 단계 이동")},
@@ -1596,6 +1596,44 @@ function matchView(m){
     m.rows.map(x=>h("div",null,h("span",{class:"bk-c "+c[x.lv]},`${x.lv} ${x.c}건`)," ",h("b",null,x.n),x.ex.length?` · ${x.ex.join(" / ")}`:" · 현 직장 업무 기록에 근거 없음")),
     h("div",{class:"faint",style:"font-size:11.5px"},"현 직장 업무 기록 기준 자동 계산입니다. 이전 경력·자격은 들어가지 않으니 최종 판단은 「공고 분석해줘」로 햄꾼에게 맡겨 주세요."));
 }
+S.docOpen={};S.docJob=null;
+/* 서류 준비: 지원처별 서류를 노션 「지원 서류」에서 읽고 바로 고침. 자소서는 문항 1개가 1줄 */
+const DOC_KINDS=["이력서","경력기술서","자기소개서","포트폴리오","기타"],DOC_ST=["미착수","초안","검토 중","최종","제출 완료"];
+const DOC_C={미착수:"",초안:"o",["검토 중"]:"o",최종:"g",["제출 완료"]:"g"};
+const docsOf=id=>(S.data.docs||[]).filter(d=>id==="common"?!(d.job||[]).length:(d.job||[]).some(x=>x.replace(/-/g,"")===id.replace(/-/g,""))).sort((a,b)=>(a.o??99)-(b.o??99));
+const docDone=d=>d.st==="최종"||d.st==="제출 완료";
+function docAdd(job,kind,t,o){const f={t,kind,st:"미착수",job:job==="common"?[]:[job],o};const tmp="tmp-d"+Date.now()+Math.random();
+  return mutate(D=>{(D.docs=D.docs||[]).push(Object.assign({id:tmp},f))},async()=>{const r=await api("add",{kind:"doc",fields:f});replaceIn(S.data.docs,tmp,r)})}
+const docUp=(d,f,msg)=>mutate(D=>Object.assign(byId(D.docs,d.id),f),()=>api("update",{kind:"doc",id:d.id,fields:f}),msg);
+function docRow(d){
+  const id="doc-"+d.id,open=!!S.docOpen[d.id],v=S.drafts[id]??(d.body||""),n=v.length,over=d.lim&&n>d.lim;
+  return h("div",{class:"bk"+(docDone(d)?" ok":"")},
+    h("div",{class:"bk-m",role:"button",tabindex:"0","aria-expanded":String(open),onclick:()=>{S.docOpen[d.id]=!open;render()},onkeydown:e=>{if(e.key==="Enter"){S.docOpen[d.id]=!open;render()}}},
+      h("span",{class:"bk-c "+(DOC_C[d.st]||"")},d.st||"미착수"),h("b",{class:"bk-t"},d.t||"(제목 없음)"),h("span",{class:"faint num",style:"font-size:12px"+(over?";color:#ff6961":"")},d.lim?`${n}/${d.lim}자`:`${n}자`)),
+    h("div",{class:"bk-a"},d.u?h("a",{class:"btn sm ghost",href:d.u,target:"_blank",rel:"noopener"},"노션"):null),
+    open?h("div",{class:"bk-d"},
+      h("div",{class:"chips"},DOC_ST.map(s=>h("button",{class:"chip","aria-pressed":String(d.st===s),onclick:()=>docUp(d,{st:s})},s))),
+      h("textarea",{class:"in",id,rows:String(Math.min(18,Math.max(5,Math.ceil(n/60)+2))),value:v,placeholder:"내용을 쓰면 칸을 벗어날 때 노션에 저장됩니다",oninput:e=>{S.drafts[id]=e.target.value;const c=e.target.closest(".bk").querySelector(".num");if(c)c.textContent=d.lim?`${e.target.value.length}/${d.lim}자`:`${e.target.value.length}자`},
+        onchange:e=>{const t=e.target.value;delete S.drafts[id];docUp(d,{body:t},"노션에 저장했습니다")}}),
+      h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},h("input",{class:"in",type:"number",min:"0",style:"width:110px",value:d.lim??"",placeholder:"글자 제한","aria-label":"글자 제한",onchange:e=>docUp(d,{lim:e.target.value?+e.target.value:null},"저장했습니다")}),
+        h("input",{class:"in grow",value:d.memo||"",placeholder:"확인할 것, 메모","aria-label":"메모",onchange:e=>docUp(d,{memo:e.target.value},"저장했습니다")}),
+        h("button",{class:"btn sm bad",onclick:e=>{const b=e.currentTarget;if(b.dataset.arm){mutate(D=>{D.docs=D.docs.filter(x=>x.id!==d.id)},()=>api("trash",{kind:"doc",id:d.id}),"노션 휴지통으로 옮겼습니다")}else{b.dataset.arm="1";b.textContent="한 번 더 누르면 삭제"}}},"삭제")),
+      d.file?h("div",null,h("b",null,"파일 "),d.file):null):null);
+}
+function docsCard(){
+  const js=(S.data.jobs||[]).filter(j=>j.st==="서류 준비"),tabs=[...js.map(j=>[j.id,j.n,j]),["common","공통 기준본",null]];
+  if(!tabs.some(t=>t[0]===S.docJob))S.docJob=tabs[0][0];
+  const cur=tabs.find(t=>t[0]===S.docJob),ds=docsOf(S.docJob),job=cur[2],n=job&&job.d?diff(dOf(job.d),TODAY()):null,add=S.drafts["doc-q"]||"";
+  const tab=([id,name])=>{const a=docsOf(id);return h("button",{"aria-pressed":String(S.docJob===id),onclick:()=>{S.docJob=id;render()}},`${name} ${a.filter(docDone).length}/${a.length}`)};
+  const missing=job?DOC_KINDS.slice(0,4).filter(k=>!ds.some(d=>d.kind===k)):[];
+  const groups=[...(job?DOC_KINDS:["기준본","이력서","경력기술서","기타"])].map(k=>[k,ds.filter(d=>d.kind===k)]).filter(([,a])=>a.length);
+  return card("서류 준비",{icon:"work",count:job?(n==null?job.n:n<0?`${job.n} · 마감 지남`:`${job.n} · D-${n}`):"모든 지원서의 기준본",right:h("a",{class:"btn ghost sm",href:"https://app.notion.com/p/40cd0752db6381608a6fdf98b439fddd",target:"_blank",rel:"noopener"},"노션",ic("ext"))},
+    !Array.isArray(S.data.docs)?h("div",{class:"banner"},"서버 재배포 후 사용할 수 있습니다"):null,
+    h("div",{class:"seg",role:"group","aria-label":"지원처"},tabs.map(tab)),
+    groups.length?groups.map(([k,a])=>h("div",null,h("div",{class:"sec-t"},`${k} ${a.length}`),h("div",{class:"bk-l"},a.map(docRow)))):h("div",{class:"empty"},"아직 서류가 없습니다"),
+    h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},missing.map(k=>h("button",{class:"btn sm",onclick:()=>docAdd(job.id,k,`${job.n} · ${k}`,DOC_KINDS.indexOf(k)*10)},"+ "+k)),
+      job?draftIn("doc-q",{class:"in grow",placeholder:"자기소개서 문항 추가 (예: 지원 동기)","aria-label":"문항",onkeydown:e=>{if(e.key==="Enter"&&!e.isComposing&&(S.drafts["doc-q"]||"").trim()){const t=S.drafts["doc-q"].trim();S.drafts["doc-q"]="";docAdd(job.id,"자기소개서",t,20+ds.length)}}}):null));
+}
 function viewJob(){
   jmLoad();pfLoad();
   const js=S.data.jobs||[],today=TODAY(),live=js.filter(j=>!["합격","불합격","보류"].includes(j.st)),mails=JM.d||[];
@@ -1623,7 +1661,7 @@ function viewJob(){
     h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"업무를 끝낼 때 성과를 한 줄 적어 두면 지원서에 그대로 쓸 수 있습니다. 경력기술서·자기소개서 원본은 G: 「이직 준비」 폴더에만 둡니다."),
     h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},h("button",{class:"btn pri",onclick:()=>{S.view="pf";ls.set("desk:view","pf");render()}},"성과 기록하러 가기"),
       h("button",{class:"btn",disabled:st.n?null:"disabled",onclick:()=>pfCopy(cvLines(st).join("\n"),"경력기술서 문장을 복사했습니다")},"경력기술서 문장 복사")));
-  return [h("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr))"},flow.map(([n,v,s])=>kpi(n,v,"건",s))),fitC,h("div",{class:"grid g2"},dueCard,mailC),jobsCard(),pfC];
+  return [h("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr))"},flow.map(([n,v,s])=>kpi(n,v,"건",s))),fitC,docsCard(),h("div",{class:"grid g2"},dueCard,mailC),jobsCard(),pfC];
 }
 
 /* ═════════ 회계·행정 · 모두의 레터 ═════════ */
