@@ -35,7 +35,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-02h'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-02i'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -295,6 +295,16 @@ const ACTIONS = {
     PropertiesService.getScriptProperties().setProperty('relayAt', new Date().toISOString());
     const [staff] = queryMany([{ db: DB.staff }]);
     return { jobs: replyRows({ property: '상태', select: { equals: '대기' } }).reverse(), staff: staff.map(p => read('staff', p)) };
+  },
+  // 여러 PC가 돌아도 한 곳만 맡도록 잠그고 대기 → 작성 중으로 바꾼다
+  replyClaim({ rid }) {
+    const L = LockService.getScriptLock();
+    L.waitLock(20000);
+    try {
+      if (read('reply', notion('pages/' + rid, 'get')).st !== '대기') return { ok: false };
+      notion('pages/' + rid, 'patch', { properties: props('reply', { st: '작성 중' }) });
+      return { ok: true };
+    } finally { L.releaseLock(); }
   },
   replyUpdate({ rid, fields }) {
     const allow = {}; ['st', 'body', 'cc', 'rev', 'err'].forEach(k => { if (fields && k in fields) allow[k] = fields[k]; });
