@@ -35,7 +35,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-02i'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-03a'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -191,7 +191,9 @@ const MAP = {
            files: ['첨부', 'text'], detail: ['문서 내용', 'text'] },
   cash:  { t: ['내역', 'title'], key: ['묶음키', 'text'], sum: ['금액', 'num'], n: ['줄 수', 'num'], from: ['시작일', 'date'], to: ['종료일', 'date'],
            vendors: ['거래처', 'text'], rows: ['출납부 행', 'text'] },
-  pay:   { m: ['월', 'title'], d: ['지급일', 'date'], g: ['지급총액', 'num'], ded: ['공제총액', 'num'], net: ['실수령액', 'num'] },
+  pay:   { m: ['월', 'title'], d: ['지급일', 'date'], g: ['지급총액', 'num'], ded: ['공제총액', 'num'], net: ['실수령액', 'num'],
+    b: ['기본급여', 'num'], ot: ['연장근로수당', 'num'], ga: ['가계지원비', 'num'], fam: ['가족수당', 'num'], tr: ['교통비', 'num'], lu: ['중식보조비', 'num'], etc: ['기타 지급', 'num'], etcN: ['기타 지급 내역', null],
+    tax: ['소득세', 'num'], loc: ['주민세', 'num'], np: ['국민연금', 'num'], hi: ['건강보험', 'num'], lt: ['장기요양', 'num'], ei: ['고용보험', 'num'], cl: ['사우회비', 'num'], ye: ['연말정산', 'num'] },
   staff: { n: ['직원', 'title'], st: ['근무', 'select'], left: ['남은 사용량', 'num'], ver: ['버전', 'text'], at: ['확인 시각', 'text'] },
   reply: { t: ['제목', 'title'], st: ['상태', 'select'], mid: ['메일ID', 'text'], src: ['계정', 'select'], from: ['보낸이', 'text'], ask: ['지시', 'text'],
            body: ['회신', 'text'], cc: ['참조', 'text'], rev: ['검수', 'text'], err: ['오류', 'text'], at: ['요청 시각', 'text'] },

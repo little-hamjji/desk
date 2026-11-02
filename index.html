@@ -687,6 +687,8 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .mi.ev{background:rgba(10,132,255,.2);color:#cfe5ff}
 .mi.t{color:var(--fg2)}.mi.t.hi{color:#ffb340}.mi.t.done{color:var(--fg3);text-decoration:line-through}
 .mi.more{color:var(--fg3);cursor:pointer}.mi.more:hover{color:var(--fg1,#fff)}.mcell .cnt{cursor:pointer}
+.pay-d{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;padding:6px 4px;max-width:440px}
+.pay-d h6{margin:0 0 6px;font-size:11.5px;color:var(--fg3)}.pay-d .r{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:2px 0}
 .daypop .dlist{display:grid;gap:4px;max-height:60vh;overflow:auto}
 .daypop .dr{all:unset;box-sizing:border-box;display:grid;gap:2px;padding:7px 9px;border-radius:8px;font-size:13px;min-width:0}
 .daypop .dr span{font-size:11.5px;color:var(--fg3)}
@@ -1270,7 +1272,11 @@ function viewAtt(){
       h("div",{class:"acts"},confirmBtn("기록 지우기",()=>trash("att",r.id,"att"))))})):h("div",{class:"empty"},"기록이 없습니다"));
   const pays=(D.pays||[]).slice().sort((a,b)=>a.m<b.m?1:-1),yr=today.slice(0,4),py=pays.filter(p=>String(p.m).startsWith(yr)),pl=pays[0];
   const payCard=card("급여 현황",{icon:"att",count:pl?`최근 ${pl.m} · 올해 실수령 ${won(py.reduce((s,p)=>s+(p.net||0),0))}`:"",right:h("a",{class:"btn ghost sm",href:"https://app.notion.com/p/adb31cb4bdb44afabcc0bba517301fef",target:"_blank",rel:"noopener"},"노션",ic("ext"))},
-    pays.length?h("div",{class:"tbl-wrap"},h("table",null,h("thead",null,h("tr",null,["월","지급일","지급총액","공제총액","실수령액"].map(x=>h("th",null,x)))),h("tbody",null,pays.map(p=>h("tr",null,h("td",null,p.m),h("td",null,p.d?fmtMD(dOf(p.d)):"–"),h("td",null,won(p.g)),h("td",null,(p.ded||0)<0?"환급 "+won(-p.ded):won(p.ded)),h("td",null,h("b",null,won(p.net)))))))):h("div",{class:"empty"},"급여 기록이 없습니다"));
+    pays.length?h("div",{class:"tbl-wrap"},h("table",null,h("thead",null,h("tr",null,["월","지급일","기본급여","연장근로","가계지원비","수당·보조","기타","지급총액","공제총액","실수령액"].map(x=>h("th",null,x)))),h("tbody",null,pays.flatMap(p=>{const z=v=>v?won(v):"–",open=S.payOpen===p.m;return [
+      h("tr",{style:"cursor:pointer",title:"누르면 항목별로 펼칩니다",onclick:()=>{S.payOpen=open?null:p.m;render()}},h("td",null,p.m),h("td",null,p.d?fmtMD(dOf(p.d)):"–"),h("td",null,z(p.b)),h("td",null,z(p.ot)),h("td",null,z(p.ga)),h("td",null,z((p.fam||0)+(p.tr||0)+(p.lu||0))),h("td",{title:p.etcN||""},z(p.etc)),h("td",null,won(p.g)),h("td",null,(p.ded||0)<0?"환급 "+won(-p.ded):won(p.ded)),h("td",null,h("b",null,won(p.net)))),
+      open?h("tr",null,h("td",{colspan:"10"},h("div",{class:"pay-d"},
+        h("div",null,h("h6",null,"받은 항목"),[["기본급여",p.b],["연장근로수당",p.ot],["가계지원비",p.ga],["가족수당",p.fam],["교통비",p.tr],["중식보조비",p.lu],[p.etcN||"기타 지급",p.etc]].filter(x=>x[1]).map(([n,v])=>h("div",{class:"r"},h("span",null,n),h("b",null,won(v))))),
+        h("div",null,h("h6",null,"빠진 항목"),[["소득세",p.tax],["주민세",p.loc],["국민연금",p.np],["건강보험",p.hi],["장기요양",p.lt],["고용보험",p.ei],["사우회비",p.cl],["연말정산",p.ye]].filter(x=>x[1]).map(([n,v])=>h("div",{class:"r"},h("span",null,n),h("b",null,v<0?"환급 "+won(-v):won(v)))))))):null].filter(Boolean)})))):h("div",{class:"empty"},"급여 기록이 없습니다"));
   return [k,h("div",{class:"grid g-today"},h("div",{class:"stack"},tbl,payCard,list),attForm())];
 }
 function attForm(){
