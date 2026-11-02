@@ -34,7 +34,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-02f'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-02g'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -233,6 +233,8 @@ const ACTIONS = {
   },
 
   // 연결 확인용
+  // 오른쪽 직원 패널 1분 갱신용(전체 불러오기 없이)
+  staffNow() { const [rows] = queryMany([{ db: DB.staff }]); return rows.map(p => read('staff', p)); },
   ping() { return { account: Session.getEffectiveUser().getEmail(), notion: hasNotion(), v: VERSION }; },
 
   // 스캔 메일 첨부 내려받기(대시보드에서 바로 저장)

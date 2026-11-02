@@ -878,7 +878,7 @@ async function api(action,args,which){
   const url=which==="work"?S.cfg.url2:which==="music"?(S.cfg.url3||S.cfg.url):S.cfg.url;
   if(!url)throw new Error("회사 계정 연결 주소가 없습니다");
   // 읽기 전용 동작만 한 번 더 시도(추가·수정은 두 번 들어가지 않게 재시도 안 함)
-  const safe=/^(load|ping|mailBody|pageText|stocks|yt|history)/.test(action);let txt;
+  const safe=/^(load|ping|staffNow|mailBody|pageText|stocks|yt|history)/.test(action);let txt;
   for(let k=0;;k++){
     try{const r=await fetchT(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({pass:S.cfg.pass,action,args})},60000);txt=await r.text();break}
     catch(e){if(!safe||k>=1)throw new Error(e.name==="AbortError"?"서버가 60초 넘게 응답하지 않습니다":"인터넷 연결이 끊겼습니다");await new Promise(z=>setTimeout(z,1500))}
@@ -2775,6 +2775,8 @@ document.addEventListener("keydown",e=>{
 // 시계·자동 새로고침
 setInterval(()=>{const c=$("#clock");if(c){const d=new Date();c.textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}`}renderSync()},15000);
 setInterval(()=>{if(!document.hidden&&!S.sel)refresh(true)},5*60e3);
+// 직원 상태만 1분마다 가볍게 다시 읽음(바뀌었을 때만 오른쪽 패널을 다시 그림)
+setInterval(async()=>{if(document.hidden||!S.data||S.demo)return;try{const x=await api("staffNow",{});if(JSON.stringify(x)!==JSON.stringify(S.data.staff)){S.data.staff=x;if(!document.querySelector("#rail:hover"))fill($("#rail"),railView())}}catch{}},60e3);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.data&&!S.demo&&Date.now()-Date.parse(S.data.at||0)>60e3)refresh(true)});
 let lastDay=TODAY();setInterval(()=>{if(TODAY()!==lastDay){lastDay=TODAY();render()}},60e3);
 
