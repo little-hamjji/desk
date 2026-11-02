@@ -52,7 +52,7 @@ svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-widt
 
 /* ── 창 ── */
 .app{position:fixed;inset:max(4px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left));
-  display:grid;grid-template-columns:232px minmax(0,1fr);border-radius:14px;overflow:hidden;
+  display:grid;grid-template-columns:232px minmax(0,1fr) 276px;border-radius:14px;overflow:hidden;
   border:.5px solid rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 .5px rgba(0,0,0,.6)}
 .side{background:var(--side);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);
   border-right:.5px solid rgba(0,0,0,.5);display:flex;flex-direction:column;min-height:0}
@@ -418,34 +418,35 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .appr-d{display:flex;gap:8px;align-items:center;font-size:12px}
 /* 현금출납부 → 미작성 지결 */
 .cash{display:grid;gap:6px;max-height:900px;overflow:auto}
-.staffs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.staff{--c:#ffd60a;display:grid;gap:10px;padding:14px 16px 14px 18px;position:relative;overflow:hidden;cursor:pointer;border-radius:var(--r);border:.5px solid var(--line);background:rgba(255,255,255,.04);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);min-width:0}
+.rail{overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:10px;background:var(--side);border-left:.5px solid var(--line);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
+.rail h6{margin:2px 4px;font-size:11.5px;color:var(--fg3);font-weight:600}
+.staff{--c:#ffd60a;display:grid;gap:8px;padding:12px 12px 12px 14px;position:relative;overflow:hidden;cursor:pointer;border-radius:12px;border:.5px solid var(--line);background:rgba(255,255,255,.04);min-width:0;flex:none}
 .staff.jp{--c:#30d158}
 .staff::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
-.staff.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 8%,transparent)}
-.staff.off{opacity:.62}
-.staff .who{display:flex;align-items:center;gap:8px}
-.staff .who b{color:var(--c);font-size:16px}
-.staff .emo{font-size:22px;line-height:1}
-.staff .st{margin-left:auto;font-size:12px;color:var(--fg2)}
-.staff .lb{display:flex;justify-content:space-between;font-size:12px;color:var(--fg2)}
+.staff.sel{border-color:var(--c)}
+.staff.off .who,.staff.off .use{opacity:.55}
+.staff .who{display:flex;align-items:center;gap:7px}
+.staff .who b{color:var(--c);font-size:15px}
+.staff .emo{font-size:20px;line-height:1}
+.staff .st{margin-left:auto;font-size:11.5px;color:var(--fg2)}
+.staff .lb{display:flex;justify-content:space-between;font-size:11.5px;color:var(--fg2)}
 .staff .lb b{color:var(--fg)}
-.staff .tr{height:5px;border-radius:3px;background:rgba(118,118,128,.25);margin-top:5px;overflow:hidden}
+.staff .tr{height:5px;border-radius:3px;background:rgba(118,118,128,.25);margin-top:4px;overflow:hidden}
 .staff .tr i{display:block;height:100%;background:var(--c)}
-.staff small{display:block;margin-top:3px;font-size:11px;color:var(--fg3)}
-.staff .ctl{display:flex;align-items:center;gap:10px}
-.wheel{flex:1;min-width:0;height:66px;overflow-y:auto;scroll-snap-type:y mandatory;border-radius:9px;background:rgba(118,118,128,.14);display:flex;flex-direction:column;scrollbar-width:none}
+.staff small{display:block;margin-top:3px;font-size:10.5px;color:var(--fg3)}
+.staff .modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+.staff .modes button{border:.5px solid var(--line);background:transparent;color:var(--fg2);border-radius:7px;font-size:10.5px;padding:4px 0;cursor:pointer;white-space:nowrap}
+.staff .modes button[aria-pressed=true]{border-color:var(--c);color:var(--c);font-weight:700}
+.staff .lbl{font-size:11px;color:var(--fg3);margin-bottom:-5px}
+.staff details summary{font-size:11.5px;color:var(--fg2);cursor:pointer}
+.staff ul{margin:5px 0 0;padding-left:16px;font-size:11.5px;line-height:1.55;color:var(--fg2)}
+.wheel{height:66px;overflow-y:auto;scroll-snap-type:y mandatory;border-radius:9px;background:rgba(118,118,128,.14);display:flex;flex-direction:column;scrollbar-width:none}
 .wheel::-webkit-scrollbar{display:none}
 .wheel .pad{flex:0 0 22px}
 .wheel button{flex:0 0 22px;border:0;background:transparent;color:var(--fg3);font-size:12.5px;scroll-snap-align:center;cursor:pointer}
 .wheel button.on{color:var(--c);font-weight:700}
-.staffs.mini .staff{grid-template-columns:minmax(120px,auto) minmax(90px,1fr) minmax(210px,auto);align-items:center;gap:14px;padding:6px 12px 6px 16px}
-.staffs.mini .staff.sel{border-color:var(--line);background:rgba(255,255,255,.04)}
-.staffs.mini .wheel{height:44px;flex:0 0 112px}
-.staffs.mini .wheel .pad{flex-basis:11px}
-.staffs.mini .who{gap:6px}
-.staffs.mini .st{margin-left:4px}
-@media(max-width:700px){.staffs{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:1180px){.app{grid-template-columns:232px minmax(0,1fr)}.rail{display:none}}
+
 .bk-l{display:grid;gap:6px}
 .bk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:9px 12px;border:.5px solid var(--line);border-radius:10px;align-items:center}
 .bk.ok{opacity:.6}
@@ -790,6 +791,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
     <div class="toolbar" id="toolbar"></div>
     <div class="scroll" id="scroll"><div class="page" id="page"></div></div>
   </main>
+  <aside class="rail" id="rail" aria-label="직원 관리"></aside>
 </div>
 <div id="layer"></div>
 
@@ -1034,7 +1036,7 @@ function viewToday(){
     decs.length?h("div",{class:"list"},decs.sort((a,b)=>({"상":0,"중":1,"하":2}[a.r]??3)-({"상":0,"중":1,"하":2}[b.r]??3)).map(t=>taskRow(t,{strip:true,quickToday:false}))):h("div",{class:"empty"},"지금 결정할 일이 없습니다"));
 
   const right=h("div",{class:"stack"},dec,scanCard(),mailCard("work"),newsMini(),habitsCard(true),memoCard(5));
-  return [hero,h("div",{class:"staffs mini"},Object.keys(STAFF).map(k=>staffCard(k,true))),h("div",{class:"quick-row"},quickAdd(),h("div",{class:"motto"},h("h3",null,"나에게 가장 중요한 문장"),h("p",null,"세상을 다정에 담아 더 행복해지기를"),h("p",null,"Take time to deliberate, but when the time for action comes, stop thinking and go in"))),ddays,h("div",{class:"grid g-today"},left,right),weekCard(),monthCard(),projectsCard()];
+  return [hero,h("div",{class:"quick-row"},quickAdd(),h("div",{class:"motto"},h("h3",null,"나에게 가장 중요한 문장"),h("p",null,"세상을 다정에 담아 더 행복해지기를"),h("p",null,"Take time to deliberate, but when the time for action comes, stop thinking and go in"))),ddays,h("div",{class:"grid g-today"},left,right),weekCard(),monthCard(),projectsCard()];
 }
 const greet=d=>{const H=d.getHours();return H<11?"좋은 아침입니다":H<14?"점심 맛있게 드세요":H<18?"오후도 힘내세요":"오늘도 수고 많으셨습니다"};
 function stat(label,n,cls,on){return h("button",{class:"stat "+cls,onclick:on},h("b",null,n),h("span",null,label))}
@@ -1256,7 +1258,10 @@ function viewAtt(){
     return h("div",{class:"memo"},h("div",null,h("p",null,h("span",{class:"pill "+({"야근":"orange","연차":"blue","반차":"blue","특별휴가":"green","대체휴가":""}[r.type]||"")},r.type||"—")," ",r.d?fmtMD(dOf(r.d)):"",r.reason?" · "+r.reason:""),
       h("div",{class:"meta"},hsum?h("span",null,`실근무 ${hsum}h`):null,r.bonus!=null&&r.type==="야근"?h("span",null,`할증 ${hrs(r.bonus)}`):null,r.days?h("span",null,`${r.days}일`):null)),
       h("div",{class:"acts"},confirmBtn("기록 지우기",()=>trash("att",r.id,"att"))))})):h("div",{class:"empty"},"기록이 없습니다"));
-  return [k,h("div",{class:"grid g-today"},h("div",{class:"stack"},tbl,list),attForm())];
+  const pays=(D.pays||[]).slice().sort((a,b)=>a.m<b.m?1:-1),yr=today.slice(0,4),py=pays.filter(p=>String(p.m).startsWith(yr)),pl=pays[0];
+  const payCard=card("급여 현황",{icon:"att",count:pl?`최근 ${pl.m} · 올해 실수령 ${won(py.reduce((s,p)=>s+(p.net||0),0))}`:"",right:h("a",{class:"btn ghost sm",href:"https://app.notion.com/p/adb31cb4bdb44afabcc0bba517301fef",target:"_blank",rel:"noopener"},"노션",ic("ext"))},
+    pays.length?h("div",{class:"tbl-wrap"},h("table",null,h("thead",null,h("tr",null,["월","지급일","지급총액","공제총액","실수령액"].map(x=>h("th",null,x)))),h("tbody",null,pays.map(p=>h("tr",null,h("td",null,p.m),h("td",null,p.d?fmtMD(dOf(p.d)):"–"),h("td",null,won(p.g)),h("td",null,(p.ded||0)<0?"환급 "+won(-p.ded):won(p.ded)),h("td",null,h("b",null,won(p.net)))))))):h("div",{class:"empty"},"급여 기록이 없습니다"));
+  return [k,h("div",{class:"grid g-today"},h("div",{class:"stack"},tbl,payCard,list),attForm())];
 }
 function attForm(){
   const t=S.drafts["a-type"]||"야근",ot=t==="야근";
@@ -2475,23 +2480,27 @@ function monthCard(){
 
 /* ═════════ 햄찌스 오피스: 직원별 업무일지·시말서 ═════════ */
 S.pageText={};S.staff=ls.get("desk:staff","ham");
-const STAFF={ham:{n:"햄꾼",emo:"🐹",vers:["Opus 5.5","Sonnet 5.5","Haiku 5.5","Fable 5.1"],logs:"logs",sor:"sorries",page:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",logDb:"https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5",sorDb:"https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"},
-  jp:{n:"지피리",emo:"🤖",vers:["gpt-6.1-sol"],logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
+const STAFF={ham:{n:"햄꾼",emo:"🐹",vers:["Opus 5.5","Sonnet 5.5","Haiku 5.5","Fable 5.1"],can:["조사·문서·코드 작성","노션·구글 캘린더·드라이브","크롬 조작, 파일 처리","지피리 호출·결과 대조"],logs:"logs",sor:"sorries",page:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",logDb:"https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5",sorDb:"https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"},
+  jp:{n:"지피리",emo:"🤖",vers:["gpt-6.1-sol"],can:["검수·교차 검토","조사·초안·코드 작업","노션 연결(승인 후)","민감 원본은 열지 않음"],logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
 const EVCLS={"칭찬":"blue","보통":"","지적받음":"red"};
 function updLog(kind,id,fields,listKey){return mutate(D=>Object.assign(byId(D[listKey],id),fields),()=>api("update",{kind,id,fields}),"저장했습니다")}
-// 직원 카드: 근무 상태·사용량·버전의 원본은 노션 「직원 상태」. 사용량은 자동 수집이 없어 확인한 값만 표시
+// 오른쪽 직원 관리: 원본은 노션 「직원 상태」. 사용량은 확인한 값만 표시
+const STAFF_MODES=["메인","서브","오프","완전 오프"];
 function staffPick(id,v){const o=STAFF[id],x=(S.data.staff||[]).find(r=>r.n===o.n);if(!x||x.ver===v)return;mutate(D=>{D.staff.find(r=>r.n===o.n).ver=v},()=>api("update",{kind:"staff",id:x.id,fields:{ver:v}}),`${o.n} 버전을 ${v}(으)로 저장했습니다`)}
-function staffCard(id,mini){
-  const o=STAFF[id],x=(S.data.staff||[]).find(r=>r.n===o.n)||{},on=x.st!=="휴식",left=x.left,sel=S.staff===id,ver=x.ver||o.vers[0],vers=o.vers.includes(ver)?o.vers:[ver,...o.vers];
+function staffCard(id){
+  const o=STAFF[id],x=(S.data.staff||[]).find(r=>r.n===o.n)||{},st=x.st||"메인",left=x.left,sel=S.staff===id,ver=x.ver||o.vers[0],vers=o.vers.includes(ver)?o.vers:[ver,...o.vers];
   const wheel=h("div",{class:"wheel",role:"listbox","aria-label":o.n+" 버전",tabindex:"0"},h("span",{class:"pad"}),vers.map(v=>h("button",{class:v===ver?"on":"",role:"option","aria-selected":String(v===ver),"data-v":v,onclick:e=>{e.stopPropagation();staffPick(id,v)}},v)),h("span",{class:"pad"}));
   let t,moved=false;["wheel","touchstart","pointerdown","keydown"].forEach(ev=>wheel.addEventListener(ev,()=>{moved=true},{passive:true})); // 화면을 그릴 때의 자동 위치 맞춤으로는 저장하지 않음
   wheel.addEventListener("scroll",()=>{if(!moved)return;clearTimeout(t);t=setTimeout(()=>{const mid=wheel.scrollTop+wheel.clientHeight/2,b=[...wheel.querySelectorAll("button")].find(el=>Math.abs(el.offsetTop-wheel.offsetTop+el.offsetHeight/2-mid)<=el.offsetHeight/2);if(b)staffPick(id,b.dataset.v)},350)});
   setTimeout(()=>{const b=wheel.querySelector("button.on");if(b)wheel.scrollTop=b.offsetTop-wheel.offsetTop-(wheel.clientHeight-b.offsetHeight)/2},0);
-  return h("section",{class:"staff "+id+(sel?" sel":"")+(on?"":" off"),role:"button",tabindex:"0","aria-pressed":String(sel),onclick:()=>{S.staff=id;ls.set("desk:staff",id);if(mini){S.view="ham";ls.set("desk:view","ham")}render()},onkeydown:e=>{if(e.key==="Enter"&&e.target===e.currentTarget){S.staff=id;ls.set("desk:staff",id);render()}}},
-    h("div",{class:"who"},h("span",{class:"emo"},o.emo),h("b",null,o.n),h("span",{class:"st"},on?"근무 중":"휴식 중")),
+  return h("section",{class:"staff "+id+(sel?" sel":"")+(/오프/.test(st)?" off":""),role:"button",tabindex:"0","aria-pressed":String(sel),onclick:()=>{S.staff=id;S.view="ham";ls.set("desk:staff",id);ls.set("desk:view","ham");render()},onkeydown:e=>{if(e.key==="Enter"&&e.target===e.currentTarget){S.staff=id;S.view="ham";render()}}},
+    h("div",{class:"who"},h("span",{class:"emo"},o.emo),h("b",null,o.n),h("span",{class:"st"},st)),
     h("div",{class:"use"},h("div",{class:"lb"},h("span",null,"남은 사용량"),h("b",{class:"num"},left==null?"미확인":left+"%")),h("div",{class:"tr"},h("i",{style:`width:${left==null?0:Math.max(0,Math.min(100,left))}%`})),x.at?h("small",null,x.at+" 확인"):null),
-    h("div",{class:"ctl"},wheel,h("button",{class:"btn sm"+(on?"":" pri"),disabled:x.id?null:"disabled",onclick:e=>{e.stopPropagation();const st=on?"휴식":"근무";mutate(D=>{D.staff.find(r=>r.n===o.n).st=st},()=>api("update",{kind:"staff",id:x.id,fields:{st}}),`${o.n}: ${st}`)}},on?"쉬게 하기":"일하게 하기")));
+    h("div",{class:"modes",role:"group","aria-label":o.n+" 활성화"},STAFF_MODES.map(m=>h("button",{"aria-pressed":String(st===m),disabled:x.id?null:"disabled",onclick:e=>{e.stopPropagation();if(st!==m)mutate(D=>{D.staff.find(r=>r.n===o.n).st=m},()=>api("update",{kind:"staff",id:x.id,fields:{st:m}}),`${o.n}: ${m}`)}},m))),
+    h("div",{class:"lbl"},"버전"),wheel,
+    h("details",{onclick:e=>e.stopPropagation()},h("summary",null,"지금 할 수 있는 일"),h("ul",null,o.can.map(c=>h("li",null,c)))));
 }
+function railView(){return [h("h6",null,"직원 관리"),Object.keys(STAFF).map(k=>staffCard(k)),h("div",{class:"faint",style:"font-size:11px;line-height:1.5"},"메인은 일을 맡고, 서브는 검수·보조, 오프는 대기, 완전 오프는 아무 일도 하지 않습니다. 노션 「직원 상태」와 같은 값입니다.")]}
 function viewHam(){
   const W=STAFF[S.staff]||STAFF.ham,logs=S.data[W.logs]||[],sor=S.data[W.sor]||[],ym=TODAY().slice(0,7),thisM=logs.filter(l=>(dOf(l.d)||"").startsWith(ym));
   const k=h("div",{class:"kpis"},kpi("이번 달 업무일지",thisM.length,"건",""),kpi("칭찬",thisM.filter(l=>l.ev==="칭찬").length,"번",""),kpi("지적받음",thisM.filter(l=>l.ev==="지적받음").length,"번",""),
@@ -2505,7 +2514,7 @@ function viewHam(){
       h("p",null,h("b",null,x.d?fmtMD(dOf(x.d)):"")," ",x.t," ",x.sev?h("span",{class:"pill "+(x.sev==="중대"?"red":x.sev==="보통"?"orange":"")},x.sev):null),
       h("div",{class:"meta"},x.cat?h("span",null,x.cat):null,h("span",null,x.sum||""))),
     h("div",{class:"chips"},["제출","대표님 확인","재발방지 완료"].map(v=>h("button",{class:"chip","aria-pressed":String(x.st===v),onclick:()=>updLog("sorry",x.id,{st:v},W.sor)},v)))))):h("div",{class:"empty"},"시말서가 없습니다"));
-  const who=h("div",{class:"staffs"},Object.keys(STAFF).map(staffCard));
+  const who=h("div",{class:"seg",role:"group","aria-label":"직원"},Object.entries(STAFF).map(([id,o])=>h("button",{"aria-pressed":String(S.staff===id),onclick:()=>{S.staff=id;ls.set("desk:staff",id);render()}},`${o.emo} ${o.n}`)));
   return [warnBanner(),who,k,h("div",{class:"grid g-today"},logCard,h("div",{class:"stack"},sorCard,card("바로가기",{},h("div",{class:"chips"},
     [["햄찌스 인사 기록실","https://app.notion.com/p/3d8d0752db63818fb0d1f1e199b58860"],["지침 모음","https://app.notion.com/p/3ded0752db6381148db2c359a61a4d03"],["업무일지 표",W.logDb],["시말서 표",W.sorDb]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))))))];
@@ -2732,7 +2741,7 @@ function render(){
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
   if(S.view!=="pf"&&PF.story!=null)storyClose();
   fill(layer,...[apprModal(),withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
-  renderSync();musicUI();restore();
+  fill($("#rail"),railView());renderSync();musicUI();restore();
   function restore(){if(!aeId)return;const el=document.getElementById(aeId);if(el&&el!==document.activeElement){el.focus();try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
 function renderSync(){
