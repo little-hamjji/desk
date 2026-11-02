@@ -136,6 +136,8 @@ select.in{padding-right:24px}
 /* 큰 제목 */
 .hero{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .hero h2{margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em}
+.hero .motto{margin-top:6px;font-size:13px;line-height:1.6;color:var(--fg2)}
+.hero .motto p{margin:0}
 .hero .clock{font-family:var(--num);font-size:30px;font-weight:300;color:var(--fg2);font-variant-numeric:tabular-nums}
 .hero .sum{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .stat{display:grid;padding:8px 14px;border-radius:10px;background:var(--card);border:.5px solid var(--line);min-width:88px;text-align:left;cursor:pointer}
@@ -795,11 +797,11 @@ const hrs=n=>n==null?"–":(Math.round(n*10)/10).toLocaleString("ko-KR")+"h";
 const agoTxt=iso=>{if(!iso)return"";const m=Math.round((Date.now()-Date.parse(iso))/6e4);return m<1?"방금":m<60?`${m}분 전`:m<1440?`${Math.round(m/60)}시간 전`:`${Math.round(m/1440)}일 전`};
 
 /* 노션 선택지 */
-const PROJECTS=["성과공유회","모두의 멘토링","1차년도 연차평가","2차년도 심사·조정","운영위원회","1차년도 종료·정산","멘토 감사장","일상 운영","모두의 아카데미","모두의 레터"];
+const PROJECTS=["성과공유회","모두의 멘토링","1차년도 연차평가","2차년도 심사·조정","운영위원회","1차년도 종료·정산","멘토 감사장","일상 운영","모두의 아카데미","모두의 레터","2차년도 회계"];
 const TYPES=["예산·회계","행정·공문","평가·심사","멘토링 운영","행사 기획·운영","기관 관리","홍보·콘텐츠","업무 자동화·도구"];
 const STATUS=["시작 전","진행 중","대기","완료"];
 const STAGES=["관심","서류 준비","지원 완료","면접","합격","불합격","보류"];
-const PCOL={"성과공유회":"var(--orange)","모두의 멘토링":"var(--blue)","1차년도 연차평가":"var(--purple)","2차년도 심사·조정":"var(--yellow)","운영위원회":"var(--brown)","1차년도 종료·정산":"var(--green)","멘토 감사장":"var(--pink)","일상 운영":"var(--gray)","모두의 아카데미":"var(--teal)","모두의 레터":"var(--mint)","모두의공모 사업 기획":"var(--indigo)","찾아가는 사업설명회":"#5ac8a8","하이플라이어스":"#c58af9"};
+const PCOL={"성과공유회":"var(--orange)","모두의 멘토링":"var(--blue)","1차년도 연차평가":"var(--purple)","2차년도 심사·조정":"var(--yellow)","운영위원회":"var(--brown)","1차년도 종료·정산":"var(--green)","멘토 감사장":"var(--pink)","일상 운영":"var(--gray)","모두의 아카데미":"var(--teal)","모두의 레터":"var(--mint)","모두의공모 사업 기획":"var(--indigo)","찾아가는 사업설명회":"#5ac8a8","하이플라이어스":"#c58af9","2차년도 회계":"#34c7a0"};
 const TCOL={"예산·회계":"var(--green)","행정·공문":"var(--gray)","평가·심사":"var(--purple)","멘토링 운영":"var(--blue)","행사 기획·운영":"var(--orange)","기관 관리":"var(--brown)","홍보·콘텐츠":"var(--pink)","업무 자동화·도구":"var(--red)"};
 const SCOL={"관심":"var(--gray)","서류 준비":"var(--yellow)","지원 완료":"var(--blue)","면접":"var(--purple)","합격":"var(--green)","불합격":"var(--red)","보류":"var(--brown)"};
 
@@ -956,7 +958,8 @@ function viewToday(){
     stat("결정 대기",decs.length,decs.length?"orange":"",()=>jump("card-dec")),
     stat("7일 안",wk,"",()=>{S.view="work";render()}));
   const hero=h("div",{class:"hero"},h("div",null,h("div",{class:"faint",style:"font-size:13px;font-weight:600"},`${now.getFullYear()}년 · ${greet(now)}`),
-    h("h2",null,`${now.getMonth()+1}월 ${now.getDate()}일 ${WD[now.getDay()]}요일`)),h("span",{class:"clock",id:"clock"},`${pad(now.getHours())}:${pad(now.getMinutes())}`),wxBox(),sum);
+    h("h2",null,`${now.getMonth()+1}월 ${now.getDate()}일 ${WD[now.getDay()]}요일`),
+    h("div",{class:"motto"},h("p",null,"세상을 다정에 담아 더 행복해지기를"),h("p",null,"Take time to deliberate, but when the time for action comes, stop thinking and go in"))),h("span",{class:"clock",id:"clock"},`${pad(now.getHours())}:${pad(now.getMinutes())}`),wxBox(),sum);
 
   // 다가오는 마감
   const dl=open.filter(t=>t.d&&(t.r==="상"||isDec(t))&&dOf(t.d)>=today&&dOf(t.d)<=addD(today,30)).sort((a,b)=>a.d<b.d?-1:1).slice(0,12);
@@ -1524,7 +1527,7 @@ function viewTools(){
   const links=card("바로가기",{icon:"ext"},h("div",{class:"chips"},
     [["노션 원데이터","https://app.notion.com/p/408d0752db638193a4c5ef39a90e2199"],["구글 캘린더","https://calendar.google.com"],["Gmail","https://mail.google.com"],["구글 드라이브","https://drive.google.com"],["유튜브 뮤직","https://music.youtube.com"]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))));
-  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},dday,links)];
+  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),bankCard(),h("div",{class:"grid g2"},dday,links)];
 }
 
 /* ═════════ 회계·행정 · 모두의 레터 ═════════ */
@@ -1848,6 +1851,126 @@ function cashCard(){
         h("div",{class:"body"},h("span",{class:"tt"},x.memo),h("div",{class:"meta"},h("span",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),h("span",null,x.n+"줄"),h("span",null,x.vendors.slice(0,2).join(", ")),
           has?h("span",{class:"pill green"},"할 일 있음"):null,cand?h("span",{class:"pill blue",title:"이카운트 결재현황에 같은 금액 기안이 있습니다. 출납부에 번호만 적으면 될 수 있어요"},"번호 후보 "+cand):h("span",{class:"pill"},"지결 작성 필요"))),
         h("b",{class:"num"+(x.sum<=0?" faint":"")},x.sum.toLocaleString()))})):null);
+}
+/* ── 통장거래내역 대조 ──
+   거래내역·대량이체·출납부 엑셀을 브라우저에서만 읽음(파일은 올리지 않음). 계좌번호·생년월일은 읽지 않고,
+   브라우저에는 대조 결과만 보관. 안 맞는 건은 오류로 단정하지 않고 「확인 필요」로 표시 */
+/*BANK-LOGIC*/
+const bankNum=v=>+String(v).replace(/[^0-9.-]/g,"")||0;
+const bankKey=t=>[t.at,t.out,t.bal].join("|");
+// 은행 원본은 지급·입금 중 한쪽만 있음. 양쪽에 숫자가 있으면 작은 쪽은 나중에 손으로 적은 메모(결의 번호 등)
+const bankAmt=(o,i)=>o&&i?(o>i?[o,0]:[0,i]):[o,i];
+const bankDays=(a,b)=>Math.round((Date.parse(a)-Date.parse(b))/864e5);
+const bankNorm=s=>String(s||"").replace(/\(주\)|㈜|주식회사|\(재\)|（재）|\s/g,"");
+function bankParse(wb,U){
+  const grid=n=>U.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}).map(r=>r.map(c=>typeof c==="string"?c.trim():c));
+  const led=wb.SheetNames.find(n=>/현금출납부\(필수\)/.test(n))||wb.SheetNames.find(n=>/현금출납부/.test(n));
+  if(led){
+    const day=v=>typeof v==="number"?new Date(Date.UTC(1899,11,30)+v*864e5).toISOString().slice(0,10):String(v).trim().replace(/\./g,"-").replace(/\s/g,"");
+    const rows=grid(led).slice(4).map((r,i)=>{const io=String(r[10]),kind=String(r[2]),v=bankNum(r[3]);
+      return {row:i+5,d:day(r[1]),amt:io==="입금"||io==="재입금"||kind==="수입결의서"?-Math.abs(v):v,vendor:String(r[4]),memo:String(r[5]),no:String(r[6])}}).filter(x=>/^\d{4}-\d{2}-\d{2}/.test(x.d)&&x.amt);
+    return {kind:"ledger",rows};
+  }
+  const A=grid(wb.SheetNames[0]),col=(h,re)=>h.findIndex(c=>re.test(String(c)));
+  let i=A.findIndex(r=>r.includes("거래일시"));
+  if(i>=0){const H=A[i],c={at:col(H,/거래일시/),kind:col(H,/^적요/),memo:col(H,/기재내용/),out:col(H,/^지급/),in:col(H,/^입금/),bal:col(H,/잔액/)};
+    const rows=A.slice(i+1).filter(r=>/^\d{4}\.\d{2}\.\d{2}/.test(String(r[c.at]))).map(r=>{const at=String(r[c.at]).replace(/\./g,"-"),[o,n]=bankAmt(bankNum(r[c.out]),c.in<0?0:bankNum(r[c.in]));
+      return {at,d:at.slice(0,10),kind:String(r[c.kind]),memo:String(r[c.memo]),out:o,in:n,bal:bankNum(r[c.bal])}}).reverse();
+    return {kind:"tx",rows};}
+  i=A.findIndex(r=>r.includes("이체실행일"));
+  if(i>=0){const H=A[i],c={d:col(H,/이체실행일/),amt:col(H,/이체금액/),who:col(H,/받는분 조회결과/),st:col(H,/처리결과/)};
+    return {kind:"mass",rows:A.slice(i+1).filter(r=>/^\d{4}\.\d{2}\.\d{2}/.test(String(r[c.d]))).map(r=>({d:String(r[c.d]).replace(/\./g,"-"),amt:bankNum(r[c.amt]),who:String(r[c.who]),st:String(r[c.st])}))};}
+  return null;
+}
+// 조합 찾기: 금액 합이 정확히 같은 2~4건
+function bankSubset(pool,target){
+  const c=pool.slice(0,12),walk=(from,left,pick)=>{if(left===0&&pick.length>=2)return pick;if(pick.length>=4)return null;
+    for(let i=from;i<c.length;i++){if(c[i].amt>left||c[i].amt<=0)continue;const r=walk(i+1,left-c[i].amt,[...pick,c[i]]);if(r)return r}return null};
+  return walk(0,target,[]);
+}
+function bankMatch(txs,ledger){
+  const T=txs.map(t=>({t,d:t.d,amt:t.out-t.in,used:!t.out&&!t.in})),L=ledger.map(l=>({l,d:l.d,amt:l.amt,used:false}));
+  const near=(a,w)=>L.filter(b=>!b.used&&b.amt===a.amt&&Math.abs(bankDays(b.d,a.d))<=w).sort((x,y)=>Math.abs(bankDays(x.d,a.d))-Math.abs(bankDays(y.d,a.d)))[0];
+  for(const w of [0,3,14,45])T.forEach(a=>{if(a.used)return;const b=near(a,w);if(b){a.used=b.used=true}});
+  const same=(a,b)=>{const m=bankNorm(a.t.memo),v=bankNorm(b.l.vendor);return /일괄/.test(m)?/일괄/.test(v):v&&m.includes(v.slice(0,3))};
+  // 통장 1건 = 출납부 여러 건(호텔 대관비처럼 나눠 적은 경우)
+  T.forEach(a=>{if(a.used||a.amt<=0)return;const pool=L.filter(b=>!b.used&&Math.abs(bankDays(b.d,a.d))<=14&&same(a,b)).sort((x,y)=>Math.abs(bankDays(x.d,a.d))-Math.abs(bankDays(y.d,a.d)));
+    const hit=bankSubset(pool,a.amt);if(hit){a.used=true;hit.forEach(b=>b.used=true)}});
+  // 출납부 1건 = 통장 여러 건
+  L.forEach(b=>{if(b.used||b.amt<=0)return;const pool=T.filter(a=>!a.used&&Math.abs(bankDays(b.d,a.d))<=14&&same(a,b));
+    const hit=bankSubset(pool,b.amt);if(hit){b.used=true;hit.forEach(a=>a.used=true)}});
+  const from=txs[0]&&txs[0].d,to=txs.length?txs[txs.length-1].d:null;
+  return {matched:T.filter(a=>a.used).length,total:T.length,
+    bankOnly:T.filter(a=>!a.used).map(a=>a.t),ledgerOnly:L.filter(b=>!b.used&&b.d>=from&&b.d<=to).map(b=>b.l)};
+}
+function bankMass(txs,mass){
+  const byD={},add=(d,k,v)=>{const o=byD[d]||(byD[d]={d,bank:0,mass:0,n:0});o[k]+=v;if(k==="mass")o.n++};
+  txs.filter(t=>/일괄/.test(t.memo)).forEach(t=>add(t.d,"bank",t.out));mass.filter(m=>m.st==="정상").forEach(m=>add(m.d,"mass",m.amt));
+  const days=Object.values(byD).sort((a,b)=>a.d<b.d?-1:1);const span=mass.length?[mass.map(m=>m.d).sort()[0],mass.map(m=>m.d).sort().pop()]:null;
+  return {days:span?days.filter(x=>x.d>=span[0].slice(0,7)+"-01"&&x.d.slice(0,7)<=span[1].slice(0,7)):[],noFile:days.filter(x=>x.mass===0).length,fail:mass.filter(m=>m.st!=="정상").length};
+}
+function bankReturns(txs,mass){
+  const out=[];txs.filter(t=>t.in>0&&!/취소/.test(t.memo)).forEach(t=>{
+    // 같은 날 승인 취소는 빼고, 하루 이상 지나 돌아온 돈만
+    const m=mass.find(x=>x.amt===t.in&&x.d<t.d&&bankDays(t.d,x.d)<=60&&t.memo.includes(x.who));
+    const p=m?{d:m.d}:txs.filter(x=>x.out===t.in&&x.d<t.d&&bankDays(t.d,x.d)<=60&&x.memo.includes(bankNorm(t.memo).slice(0,3))).pop();
+    if(!p)return;const again=txs.find(x=>x.out===t.in&&x.at>t.at&&bankDays(x.d,t.d)<=60&&x.memo.includes(bankNorm(t.memo).slice(0,3)));
+    out.push({key:bankKey(t),d:t.d,memo:t.memo,amt:t.in,prev:p.d,next:again?again.d:null})});
+  return out.reverse();
+}
+function bankBreaks(txs){const b=[];for(let i=1;i<txs.length;i++){const p=txs[i-1],t=txs[i];if(p.bal-t.out+t.in!==t.bal)b.push({from:p.d,to:t.d,diff:t.bal-(p.bal-t.out+t.in)})}return b}
+function bankRun(F){
+  const txs=[...F.tx.values()].sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:a.i-b.i);if(!txs.length)return null;
+  const months={};txs.forEach(t=>{const k=t.d.slice(0,7),o=months[k]||(months[k]={m:k,out:0,in:0,n:0,bal:0});o.out+=t.out;o.in+=t.in;o.n++;o.bal=t.bal});
+  const last=txs[txs.length-1],lim=x=>({at:x.at,d:x.d,memo:x.memo,out:x.out,in:x.in,bal:x.bal});
+  const m=F.ledger.length?bankMatch(txs,F.ledger):null;
+  return {at:new Date().toISOString(),from:txs[0].d,to:last.d,n:txs.length,bal:last.bal,files:F.files,months:Object.values(months).reverse(),
+    mass:F.mass.length?bankMass(txs,F.mass):null,returns:bankReturns(txs,F.mass),breaks:bankBreaks(txs),
+    match:m?{matched:m.matched,total:m.total,bankOnly:m.bankOnly.map(lim),ledgerOnly:m.ledgerOnly.map(l=>({row:l.row,d:l.d,amt:l.amt,vendor:l.vendor,memo:l.memo.slice(0,50),no:l.no}))}:null};
+}
+/*BANK-LOGIC-END*/
+const BF={tx:new Map(),mass:[],ledger:[],files:[]};S.bank=ls.get("desk:bank",null);S.bankPick={};S.bankDone=new Set(ls.get("desk:bankDone",[]));
+async function bankRead(files){
+  try{toast("파일을 읽는 중…");await loadXLSX();let bad=[];
+    for(const f of files){const r=bankParse(XLSX.read(await f.arrayBuffer(),{type:"array"}),XLSX.utils);if(!r){bad.push(f.name);continue}
+      if(r.kind==="tx")r.rows.forEach((t,i)=>{const k=bankKey(t);if(!BF.tx.has(k))BF.tx.set(k,Object.assign(t,{i:BF.tx.size}))});
+      else if(r.kind==="mass")BF.mass=[...BF.mass,...r.rows.filter(m=>!BF.mass.some(x=>x.d===m.d&&x.amt===m.amt&&x.who===m.who))];
+      else BF.ledger=r.rows;
+      if(!BF.files.includes(f.name))BF.files.push(f.name)}
+    S.bank=bankRun(BF);if(S.bank)ls.set("desk:bank",S.bank);S.bankPick={};render();
+    toast(bad.length?`읽지 못한 파일 ${bad.length}개: ${bad[0]}`:"대조를 마쳤습니다",bad.length?"bad":undefined);
+  }catch(e){toast("통장 파일 읽기 실패 · "+e.message,"bad")}
+}
+const bankHas=k=>S.bankDone.has(k)||(S.data.tasks||[]).some(t=>(t.note||"").includes(k));
+async function bankAdd(){
+  const m=S.bank&&S.bank.match,sel=m?m.bankOnly.filter(t=>S.bankPick[bankKey(t)]&&!bankHas(bankKey(t))):[];if(!sel.length)return toast("추가할 거래를 골라 주세요","bad");
+  if(!S.cfg||S.demo)return toast("예시 모드에서는 추가하지 않습니다","bad");
+  let n=0;toast(`할 일 ${sel.length}건을 추가하는 중…`);
+  for(const t of sel){const k=bankKey(t);
+    try{await api("add",{kind:"tasks",fields:{t:`출납부 확인 — ${fmtMD(t.d)} ${t.memo} (${(t.out||t.in).toLocaleString()}원 ${t.out?"지급":"입금"})`,s:"시작 전",d:TODAY(),c:"모두의공모",y:"예산·회계",p:"일상 운영",
+      detail:"통장에는 있는데 출납부에서 같은 금액을 찾지 못한 거래",note:"통장:"+k}});S.bankDone.add(k);n++}catch(e){toast("추가 실패 · "+e.message,"bad");break}}
+  ls.set("desk:bankDone",[...S.bankDone]);S.bankPick={};toast(`할 일 ${n}건을 추가했습니다`);refresh(true);
+}
+function bankCard(){
+  const B=S.bank,pick=e=>{const f=[...e.currentTarget.files];e.currentTarget.value="";if(f.length)bankRead(f)},won=v=>Math.abs(v).toLocaleString(),md=d=>fmtMD(d);
+  const M=B&&B.match,sel=M?M.bankOnly.filter(t=>S.bankPick[bankKey(t)]&&!bankHas(bankKey(t))):[];
+  const line=(a,b,c)=>h("div",{class:"task",style:"grid-template-columns:auto 1fr auto"},h("span",{class:"faint num",style:"font-size:12px;white-space:nowrap"},a),h("div",{class:"body"},h("span",{class:"tt"},b)),h("b",{class:"num",style:"font-size:13px"},c));
+  return card("통장거래내역 대조",{icon:"att",count:B?`${agoTxt(B.at)} · ${B.from} ~ ${B.to}`:"거래내역 · 대량이체 · 출납부"},
+    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"「파일 불러오기」 → ",h("b",null,"F:\\함께일하는재단\\모두의 공모\\통장거래내역"),"에서 파일을 고르세요. 여러 개를 한 번에 골라도 되고, 겹치는 거래는 한 번만 셉니다. 출납부도 같이 고르면 대조합니다. 파일은 올리지 않고 계좌번호·생년월일은 읽지 않으며, 이 브라우저에 결과만 남습니다."),
+    h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
+      h("label",{class:"btn pri",style:"cursor:pointer"},ic("plus"),"파일 불러오기",h("input",{type:"file",multiple:"multiple",accept:".xlsx,.xls",style:"display:none",onchange:pick})),
+      M?h("button",{class:"btn go",disabled:!sel.length,onclick:bankAdd},`고른 ${sel.length}건 할 일에 추가`):null),
+    !B?null:h("div",{class:"stack"},
+      h("div",{class:"kpis"},kpi("거래",B.n.toLocaleString(),"건",`파일 ${B.files.length}개`),kpi("마지막 잔액",won(B.bal),"원",B.to),kpi("출납부 대조",M?M.matched+"/"+M.total:"–",M?"건":"",M?`확인 필요 ${M.bankOnly.length+M.ledgerOnly.length}건`:"출납부를 같이 고르세요")),
+      B.breaks.length?h("div",{class:"banner"},`잔액이 이어지지 않는 곳 ${B.breaks.length}곳: 그 사이 거래내역 파일이 빠졌을 수 있습니다 (${B.breaks.slice(0,3).map(x=>`${md(x.from)}~${md(x.to)}`).join(", ")})`):null,
+      h("details",null,h("summary",null,`월별 입출금 ${B.months.length}개월`),h("div",{class:"list"},B.months.map(x=>line(x.m,`지급 ${x.out.toLocaleString()} · 입금 ${x.in.toLocaleString()} · ${x.n}건`,x.bal.toLocaleString())))),
+      B.mass?h("details",{open:"open"},h("summary",null,`일괄송금 ↔ 대량이체 · 일치 ${B.mass.days.filter(x=>x.bank===x.mass).length}/${B.mass.days.length}일`),
+        h("div",{class:"list"},B.mass.days.map(x=>line(md(x.d),`${x.n}명 · 통장 ${x.bank.toLocaleString()} / 대량이체 ${x.mass.toLocaleString()}`,x.bank===x.mass?"일치":"차이 "+won(x.bank-x.mass)))),
+        B.mass.noFile?h("div",{class:"faint",style:"font-size:11.5px"},`대량이체 파일이 없는 일괄송금 ${B.mass.noFile}일은 받는 사람을 알 수 없어 뺐습니다`):null):null,
+      B.returns.length?h("details",{open:"open"},h("summary",null,`돌아온 이체 ${B.returns.length}건`),h("div",{class:"list"},B.returns.map(x=>line(md(x.d),`${x.memo} · ${md(x.prev)} 이체 후 입금${x.next?` → ${md(x.next)} 재이체`:" · 재이체 못 찾음"}`,won(x.amt))))):null,
+      M&&M.bankOnly.length?h("details",{open:"open"},h("summary",null,`통장에만 있음 ${M.bankOnly.length}건`),h("div",{class:"list"},M.bankOnly.slice(0,60).map(t=>{const k=bankKey(t),had=bankHas(k);
+        return h("div",{class:"task"},h("input",{type:"checkbox","aria-label":t.memo+" 고르기",disabled:had?"disabled":null,checked:S.bankPick[k]?"checked":null,onchange:e=>{S.bankPick[k]=e.target.checked;render()}}),h("div",{class:"body"},h("span",{class:"tt"},t.memo),h("div",{class:"meta"},h("span",null,md(t.d)),had?h("span",null,"할 일에 있음"):null)),h("b",{class:"num",style:"font-size:13px"},(t.out?"-":"+")+won(t.out||t.in)))}))):null,
+      M&&M.ledgerOnly.length?h("details",null,h("summary",null,`출납부에만 있음 ${M.ledgerOnly.length}건`),h("div",{class:"list"},M.ledgerOnly.slice(0,60).map(l=>line(md(l.d),`${l.vendor||"거래처 없음"} · ${l.memo}`,(l.amt<0?"+":"")+won(l.amt))))):null));
 }
 /* ── 결재현황·출납부를 노션에 보관 ──
    PC에서 불러온 자료는 노션으로 올리고, 다른 기기는 노션에서 받음. 불러온 시각(at)이 더 최근인 쪽이 이김 */
