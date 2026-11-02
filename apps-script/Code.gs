@@ -31,10 +31,11 @@ const DB = {
   pay:   'adb31cb4bdb44afabcc0bba517301fef', // 급여 현황
   staff: '2668397c44f04260839b1c84eb51987d', // 직원 상태
   doc:   'ee0e7d3d318c46b791449950c8325c67', // 지원 서류
+  reply: '4da591057288497a8410fa10c7411c5f', // 회신 요청(데스크 → PC 회신 도우미)
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-02g'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-02h'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -75,6 +76,21 @@ function checkPass(pass) {
   if (String(pass || '') !== real) { cache.put('fails', String(fails + 1), 600); return '비밀번호가 맞지 않습니다'; }
   if (fails) cache.remove('fails'); // 맞게 넣으면 틀린 횟수 초기화
   return null;
+}
+
+/* ───────── 회신 ───────── */
+// 답장 대상: 내가 보낸 메일이 아닌 마지막 메일
+function replyTarget(th) {
+  const me = Session.getEffectiveUser().getEmail(), msgs = th.getMessages();
+  return msgs.slice().reverse().find(m => m.getFrom().indexOf(me) < 0) || msgs[msgs.length - 1];
+}
+function replyRows(filter) {
+  const [rows] = queryMany([{ db: DB.reply, body: { filter, sorts: [{ timestamp: 'created_time', direction: 'descending' }] }, max: 30 }]);
+  return rows.map(p => read('reply', p));
+}
+function replyView(r) {
+  const at = PropertiesService.getScriptProperties().getProperty('relayAt');
+  return { job: r, pcOn: !!at && Date.now() - new Date(at).getTime() < 2 * 60e3 };
 }
 
 /* ───────── 노션 호출 ───────── */
@@ -177,6 +193,8 @@ const MAP = {
            vendors: ['거래처', 'text'], rows: ['출납부 행', 'text'] },
   pay:   { m: ['월', 'title'], d: ['지급일', 'date'], g: ['지급총액', 'num'], ded: ['공제총액', 'num'], net: ['실수령액', 'num'] },
   staff: { n: ['직원', 'title'], st: ['근무', 'select'], left: ['남은 사용량', 'num'], ver: ['버전', 'text'], at: ['확인 시각', 'text'] },
+  reply: { t: ['제목', 'title'], st: ['상태', 'select'], mid: ['메일ID', 'text'], src: ['계정', 'select'], from: ['보낸이', 'text'], ask: ['지시', 'text'],
+           body: ['회신', 'text'], cc: ['참조', 'text'], rev: ['검수', 'text'], err: ['오류', 'text'], at: ['요청 시각', 'text'] },
   doc:   { t: ['서류', 'title'], job: ['지원처', 'rel'], kind: ['종류', 'select'], st: ['상태', 'select'], lim: ['글자 제한', 'num'], o: ['순서', 'num'],
            body: ['내용', 'text'], memo: ['메모', 'text'], file: ['파일', 'text'] },
   bank:  { t: ['거래', 'title'], k: ['키', 'text'], d: ['거래일', 'date'], out: ['지급', 'num'], in: ['입금', 'num'], bal: ['잔액', 'num'], chk: ['검수', 'select'],
@@ -255,11 +273,32 @@ const ACTIONS = {
     return { th, on };
   },
   // 답장 초안을 Gmail 임시보관함에 저장(보내기는 대표님이 Gmail에서)
-  draftReply({ id, body }) {
+  draftReply({ id, body, cc }) {
     const th = GmailApp.getThreadById(id);
     if (!th) throw new Error('메일을 찾지 못했습니다');
-    const d = th.getMessages().slice(-1)[0].createDraftReply(String(body || ''));
-    return { draft: d.getId() };
+    const d = replyTarget(th).createDraftReply(String(body || ''), cc ? { cc: String(cc) } : {});
+    return { draft: d.getId(), cc: cc || '' };
+  },
+
+  // 회신 채우기: 데스크가 요청을 넣고, PC 회신 도우미가 처리해 결과를 돌려준다(발송은 대표님만)
+  replyRequest({ id, src, subj, from, ask }) {
+    const cur = replyRows({ property: '메일ID', rich_text: { equals: String(id) } })[0];
+    if (cur && (cur.st === '대기' || cur.st === '작성 중') && Date.now() - new Date(cur.at).getTime() < 10 * 60e3) return replyView(cur);
+    const at = new Date().toISOString();
+    const page = notion('pages', 'post', { parent: { database_id: DB.reply }, properties: props('reply',
+      { t: subj || '(제목 없음)', st: '대기', mid: id, src: src === 'work' ? '회사' : '개인', from, ask, at }) });
+    return replyView(read('reply', page));
+  },
+  replyStatus({ id }) { return replyView(replyRows({ property: '메일ID', rich_text: { equals: String(id) } })[0] || null); },
+  // PC 회신 도우미 전용: 대기 목록과 직원 상태. 부를 때마다 PC가 켜져 있다고 기록
+  replyPending() {
+    PropertiesService.getScriptProperties().setProperty('relayAt', new Date().toISOString());
+    const [staff] = queryMany([{ db: DB.staff }]);
+    return { jobs: replyRows({ property: '상태', select: { equals: '대기' } }).reverse(), staff: staff.map(p => read('staff', p)) };
+  },
+  replyUpdate({ rid, fields }) {
+    const allow = {}; ['st', 'body', 'cc', 'rev', 'err'].forEach(k => { if (fields && k in fields) allow[k] = fields[k]; });
+    return read('reply', notion('pages/' + rid, 'patch', { properties: props('reply', allow) }));
   },
 
   // 스캔본 PC 보관(개인 계정 서버에서 실행): 회사 서버에서 받은 파일을 드라이브 폴더에 저장, 같은 파일은 한 번만
@@ -283,13 +322,12 @@ const ACTIONS = {
   },
 
   // 답장 바로 보내기(대표님이 대시보드에서 직접 누를 때만)
-  sendReply({ id, body }) {
+  sendReply({ id, body, cc }) {
     const th = GmailApp.getThreadById(id);
     if (!th) throw new Error('메일을 찾지 못했습니다');
-    const me = Session.getEffectiveUser().getEmail(), msgs = th.getMessages();
-    const target = msgs.slice().reverse().find(m => m.getFrom().indexOf(me) < 0) || msgs[msgs.length - 1];
-    target.reply(String(body || ''));
-    return { to: target.getFrom() };
+    const target = replyTarget(th);
+    target.reply(String(body || ''), cc ? { cc: String(cc) } : {});
+    return { to: target.getFrom(), cc: cc || '' };
   },
 
   // 주식 시세(Yahoo Finance 공개 차트, 약 15~20분 지연)
@@ -328,7 +366,7 @@ const ACTIONS = {
     const th = GmailApp.getThreadById(id);
     if (!th) throw new Error('메일을 찾지 못했습니다');
     return th.getMessages().slice(-3).map(m => ({
-      from: m.getFrom(), to: m.getTo(), date: m.getDate().toISOString(), subject: m.getSubject(),
+      from: m.getFrom(), to: m.getTo(), cc: m.getCc(), date: m.getDate().toISOString(), subject: m.getSubject(),
       body: m.getPlainBody().replace(/\n{3,}/g, '\n\n').slice(0, 6000),
     }));
   },
