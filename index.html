@@ -411,6 +411,9 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .appr-d{display:flex;gap:8px;align-items:center;font-size:12px}
 /* 현금출납부 → 미작성 지결 */
 .cash{display:grid;gap:6px;max-height:900px;overflow:auto}
+/* 완료 기록은 옆 「남은 일」 카드 높이에 맞추고 안에서 스크롤 */
+.pj-done{display:flex;flex-direction:column;min-height:0}
+.pj-scroll{flex:1 1 0;height:0;min-height:320px;overflow:auto}
 .cash-r{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 10px;border:.5px solid var(--line);border-radius:10px;background:rgba(0,0,0,.16);cursor:pointer}
 .cash-r:hover{background:rgba(255,255,255,.04)}.cash-r.done{opacity:.55;cursor:default}
 .cash-r input{margin-top:3px;accent-color:#30d158}.cash-r .tt{font-size:12.8px;line-height:1.45}
@@ -1527,7 +1530,7 @@ function viewTools(){
   const links=card("바로가기",{icon:"ext"},h("div",{class:"chips"},
     [["노션 원데이터","https://app.notion.com/p/408d0752db638193a4c5ef39a90e2199"],["구글 캘린더","https://calendar.google.com"],["Gmail","https://mail.google.com"],["구글 드라이브","https://drive.google.com"],["유튜브 뮤직","https://music.youtube.com"]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))));
-  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),bankCard(),h("div",{class:"grid g2"},dday,links)];
+  return [h("div",{class:"grid g3"},timer,basicCalc(),calc),h("div",{class:"grid g2"},dday,links)];
 }
 
 /* ═════════ 회계·행정 · 모두의 레터 ═════════ */
@@ -1548,13 +1551,13 @@ function pjBody(list){
   return [h("div",{class:"kpis"},kpi("남은 일",open.length,"건",late?`밀린 일 ${late}건`:""),kpi("이번 달 완료",done.filter(t=>(dOf(t.d)||"").startsWith(mon)).length,"건",""),kpi("전체 완료",done.length,"건",PF.loading?"기록 불러오는 중…":"")),
     h("div",{class:"grid g2"},
       card("남은 일",{count:open.length+"건"},open.length?h("div",{class:"list"},open.map(t=>taskRow(t,{type:true}))):h("div",{class:"empty"},"남은 일이 없습니다")),
-      card("완료 기록",{count:done.length+"건"},Object.keys(byM).map(k=>h("div",null,h("div",{class:"sec-t"},k==="날짜 없음"?k:`${+k.slice(0,4)}년 ${+k.slice(5)}월`),h("div",{class:"list"},byM[k].map(t=>t.old?oldRow(t):taskRow(t,{type:true,noDate:false}))))),
-        done.length>S.pjMore?h("button",{class:"btn ghost",onclick:()=>{S.pjMore+=60;render()}},"더 보기"):null,!done.length?h("div",{class:"empty"},"완료 기록이 없습니다"):null))];
+      card("완료 기록",{count:done.length+"건",cls:"pj-done"},h("div",{class:"pj-scroll"},Object.keys(byM).map(k=>h("div",null,h("div",{class:"sec-t"},k==="날짜 없음"?k:`${+k.slice(0,4)}년 ${+k.slice(5)}월`),h("div",{class:"list"},byM[k].map(t=>t.old?oldRow(t):taskRow(t,{type:true,noDate:false}))))),
+        done.length>S.pjMore?h("button",{class:"btn ghost",onclick:()=>{S.pjMore+=60;render()}},"더 보기"):null,!done.length?h("div",{class:"empty"},"완료 기록이 없습니다"):null)))];
 }
 function viewAcct(){
   const y=ACCT_Y[S.af]||ACCT_Y.all;
   return [h("div",{class:"row"},h("div",{class:"seg",role:"group","aria-label":"구분"},[["all","전체"],["acct","회계"],["admin","행정·공문"]].map(([k,n])=>h("button",{"aria-pressed":String(S.af===k),onclick:()=>{S.af=k;ls.set("desk:af",k);render()}},n)))),
-    ...pjBody(allTasks().filter(t=>y.includes(t.y))),h("div",{class:"grid g2"},apprCard(),cashCard())];
+    ...pjBody(allTasks().filter(t=>y.includes(t.y))),h("div",{class:"grid g2"},apprCard(),cashCard()),bankCard()];
 }
 function viewLetter(){return pjBody(allTasks().filter(t=>t.p==="모두의 레터"))}
 function tmParse(v){v=String(v).trim().replace(/분|min/g,"");let m=v.match(/^(\d{1,3}):(\d{1,2})$/);if(m)return (+m[1]*60+ +m[2])||null;m=v.match(/^(\d{1,3})$/);return m&&+m[1]>0?+m[1]*60:null}
