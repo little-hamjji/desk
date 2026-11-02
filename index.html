@@ -831,7 +831,7 @@ const S={
   view:ls.get("desk:view","today"), week:0, sel:null, drafts:{}, qmode:"task",
   f:{q:"",p:"",y:"",mode:"list"}, sync:{busy:false,err:null}, addDay:null, palette:null,
 };
-const VIEWS=[["today","대시보드","today"],["work","업무","work"],["life","일상","life"],["news","브리핑","news"],["att","근태·수당","att"],["pf","포트폴리오","star"],["ham","햄꾼","ham"],["tools","도구","tools"]];
+const VIEWS=[["today","대시보드","today"],["work","업무","work"],["life","일상","life"],["news","브리핑","news"],["att","근태·수당","att"],["pf","포트폴리오","star"],["ham","햄찌스 오피스","ham"],["tools","도구","tools"]];
 const PVIEWS=[["acct","회계·행정 업무","att","var(--green)"],["letter","모두의 레터","news","var(--mint)"],["job","이직 준비","star","var(--pink)"]]; // 사이드바 「프로젝트」에 고정
 
 /* ═════════ 서버 ═════════ */
@@ -1574,7 +1574,7 @@ function jmLoad(force){
 function jmOpen(m){if(!byId(S.data.mail||[],m.id))(S.data.mail=S.data.mail||[]).push(m);openMail(m,"main")}
 // 공고 ↔ 내 업무 적합도: 공고가 요구하는 역량마다 완료 업무에서 근거를 찾음. 숫자를 지어내지 않고 기록에 있는 것만 보여 줌
 // [역량, 공고에서 찾는 말, 내 업무에서 찾는 말, 해당 업무 유형]
-const JOB_SK=[["사회공헌·CSR 사업",/사회공헌|CSR|사회책임/i,/사회공헌|CSR|소규모|복지시설/i,null],["배분·공모 사업 운영",/배분|공모|지원사업|보조사업|수혜기관|사업\s?운영/,/배분|공모|재정지원|조정사업|사업비/,null],
+const JOB_SK=[["사회공헌·CSR 사업",/사회공헌|CSR|사회책임/i,/사회공헌|CSR|소규모|복지시설|배분|재정지원|사업비|기관|멘토링/i,null],["배분·공모 사업 운영",/배분|공모|지원사업|보조사업|수혜기관|사업\s?운영/,/배분|공모|재정지원|조정사업|사업비/,null],
   ["사업 기획",/기획|사업계획|제안/,/기획|사업계획|조정사업|설명회/,null],["예산·회계·정산",/예산|회계|정산|결산|집행|재무/,/예산|회계|정산|지출|지결/,"예산·회계"],
   ["파트너·기관 관리",/파트너|협력|협업|네트워크|이해관계자|기관\s?관리|유관기관/,/기관|협약|MOU|협력/,"기관 관리"],["평가·성과 관리",/성과|평가|모니터링|심사|임팩트|KPI/i,/평가|심사|모니터링|성과/,"평가·심사"],
   ["교육·멘토링",/교육|멘토|역량강화|컨설팅/,/멘토|교육|아카데미|워크숍/,"멘토링 운영"],["행사 운영",/행사|캠페인|포럼|컨퍼런스|봉사/,/행사|성과공유회|설명회|캠프|워크숍/,"행사 기획·운영"],
@@ -1587,12 +1587,12 @@ function jobMatch(text){
   if(!rows.length)return {score:0,rows,none:true};
   return {score:Math.round(rows.reduce((s,x)=>s+(x.lv==="강"?1:x.lv==="중"?.6:0),0)/rows.length*100),rows};
 }
-const jobScore=j=>{const m=jobMatch(j.post);return m&&!m.none?m.score:null};
+const jobScore=j=>{const m=jobMatch(j.post);return m&&!m.none&&m.rows.length>=3?m.score:null};
 function matchView(m){
   if(!m)return h("div",{class:"faint",style:"font-size:12px"},"공고의 주요 업무·자격요건을 붙여 넣으면 적합도를 계산합니다");
   if(m.none)return h("div",{class:"faint",style:"font-size:12px"},"아는 역량 단어를 찾지 못했습니다. 주요 업무 부분을 더 붙여 넣어 주세요");
   const c={강:"g",중:"o",약:"r"};
-  return h("div",{class:"bk-d",style:"border-top:0;padding-top:0"},h("b",{style:"font-size:13px"},`적합도 ${m.score}점 · 공고 요구 역량 ${m.rows.length}개`),
+  return h("div",{class:"bk-d",style:"border-top:0;padding-top:0"},h("b",{style:"font-size:13px"},m.rows.length>=3?`적합도 ${m.score}점 · 공고 요구 역량 ${m.rows.length}개`:`공고 내용이 짧아 점수를 내지 않습니다 · 찾은 역량 ${m.rows.length}개`),
     m.rows.map(x=>h("div",null,h("span",{class:"bk-c "+c[x.lv]},`${x.lv} ${x.c}건`)," ",h("b",null,x.n),x.ex.length?` · ${x.ex.join(" / ")}`:" · 현 직장 업무 기록에 근거 없음")),
     h("div",{class:"faint",style:"font-size:11.5px"},"현 직장 업무 기록 기준 자동 계산입니다. 이전 경력·자격은 들어가지 않으니 최종 판단은 「공고 분석해줘」로 햄꾼에게 맡겨 주세요."));
 }
@@ -1617,7 +1617,7 @@ function viewJob(){
   const ranked=live.map(j=>({j,s:jobScore(j)})).sort((a,b)=>(b.s??-1)-(a.s??-1));
   const fitC=card("공고 적합도",{icon:"star",count:"내 업무 기록과 공고 대조",cls:"attn"},ranked.length?h("div",{class:"list"},ranked.map(({j,s})=>h("div",{class:"task",style:"grid-template-columns:auto minmax(0,1fr) auto;gap:10px"},
       h("b",{class:"num",style:"font-size:15px;min-width:34px;color:"+(s==null?"var(--fg2)":s>=70?"#30d158":s>=40?"#ff9f0a":"#ff6961")},s==null?"–":s),
-      h("div",{class:"body",onclick:()=>openSheet("jobs",j.id)},h("span",{class:"tt"},j.n||"(이름 없음)"),h("div",{class:"meta"},h("span",null,j.role||""),s==null?h("span",null,"공고 내용을 넣어 주세요"):h("span",null,"보완: "+(jobMatch(j.post).rows.filter(x=>x.lv==="약").map(x=>x.n).join(", ")||"없음")))),
+      h("div",{class:"body",onclick:()=>openSheet("jobs",j.id)},h("span",{class:"tt"},j.n||"(이름 없음)"),h("div",{class:"meta"},h("span",null,j.role||""),s==null?h("span",null,"공고 원문을 넣어 주세요"):h("span",null,"보완: "+(jobMatch(j.post).rows.filter(x=>x.lv==="약").map(x=>x.n).join(", ")||"없음")))),
       h("span",{class:"faint",style:"font-size:12px"},j.st||"관심")))):h("div",{class:"empty"},"지원처를 추가하면 적합도 순으로 보입니다"));
   const pfC=card("경력 자료",{icon:"star",count:`이번 달 성과 ${outN}/3건`},
     h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"업무를 끝낼 때 성과를 한 줄 적어 두면 지원서에 그대로 쓸 수 있습니다. 경력기술서·자기소개서 원본은 G: 「이직 준비」 폴더에만 둡니다."),
@@ -2396,35 +2396,38 @@ function monthCard(){
     h("div",{class:"month"},["월","화","수","목","금","토","일"].map(w=>h("div",{class:"wd"},w)),cells));
 }
 
-/* ═════════ 햄꾼 (업무일지·시말서) ═════════ */
-S.pageText={};
+/* ═════════ 햄찌스 오피스: 직원별 업무일지·시말서 ═════════ */
+S.pageText={};S.staff=ls.get("desk:staff","ham");
+const STAFF={ham:{n:"햄꾼",logs:"logs",sor:"sorries",page:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",logDb:"https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5",sorDb:"https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"},
+  jp:{n:"지피리",logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
 const EVCLS={"칭찬":"blue","보통":"","지적받음":"red"};
 function updLog(kind,id,fields,listKey){return mutate(D=>Object.assign(byId(D[listKey],id),fields),()=>api("update",{kind,id,fields}),"저장했습니다")}
 function viewHam(){
-  const logs=S.data.logs||[],sor=S.data.sorries||[],ym=TODAY().slice(0,7),thisM=logs.filter(l=>(dOf(l.d)||"").startsWith(ym));
+  const W=STAFF[S.staff]||STAFF.ham,logs=S.data[W.logs]||[],sor=S.data[W.sor]||[],ym=TODAY().slice(0,7),thisM=logs.filter(l=>(dOf(l.d)||"").startsWith(ym));
   const k=h("div",{class:"kpis"},kpi("이번 달 업무일지",thisM.length,"건",""),kpi("칭찬",thisM.filter(l=>l.ev==="칭찬").length,"번",""),kpi("지적받음",thisM.filter(l=>l.ev==="지적받음").length,"번",""),
     kpi("평가 안 한 일지",logs.filter(l=>!l.ev).length,"건","오른쪽 칩을 누르면 평가"));
-  const logCard=card("일일 업무일지",{icon:"ham",count:"최근 40일",right:h("a",{class:"btn ghost sm",href:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",target:"_blank",rel:"noopener"},"노션 햄꾼",ic("ext"))},
+  const logCard=card("일일 업무일지",{icon:"ham",count:"최근 40일",right:h("a",{class:"btn ghost sm",href:W.page,target:"_blank",rel:"noopener"},"노션 "+W.n,ic("ext"))},
     logs.length?h("div",null,logs.map(l=>h("div",{class:"memo"},h("div",{style:"min-width:0;cursor:pointer",role:"button",tabindex:"0",onclick:()=>openLog(l.id)},
         h("p",null,h("b",null,l.d?fmtMD(dOf(l.d)):l.t)," ",l.kind?h("span",{class:"pill "+(l.kind==="야근"?"orange":l.kind==="정상근무"?"green":"")},l.kind):null,l.sorry?h("span",{class:"pill red"},"시말서"):null),
         h("div",{class:"meta"},l.hours?h("span",null,l.hours):null,h("span",null,l.sum||""))),
-      h("div",{class:"chips"},["칭찬","보통","지적받음"].map(v=>h("button",{class:"chip","aria-pressed":String(l.ev===v),onclick:()=>updLog("log",l.id,{ev:l.ev===v?null:v},"logs")},v)))))):h("div",{class:"empty"},"업무일지가 없습니다"));
+      h("div",{class:"chips"},["칭찬","보통","지적받음"].map(v=>h("button",{class:"chip","aria-pressed":String(l.ev===v),onclick:()=>updLog("log",l.id,{ev:l.ev===v?null:v},W.logs)},v)))))):h("div",{class:"empty"},"업무일지가 없습니다"));
   const sorCard=card("시말서",{icon:"ham",count:sor.length+"건"},sor.length?h("div",null,sor.map(x=>h("div",{class:"memo"},h("div",{style:"min-width:0;cursor:pointer",onclick:()=>openLog(x.id,"sorry")},
       h("p",null,h("b",null,x.d?fmtMD(dOf(x.d)):"")," ",x.t," ",x.sev?h("span",{class:"pill "+(x.sev==="중대"?"red":x.sev==="보통"?"orange":"")},x.sev):null),
       h("div",{class:"meta"},x.cat?h("span",null,x.cat):null,h("span",null,x.sum||""))),
-    h("div",{class:"chips"},["제출","대표님 확인","재발방지 완료"].map(v=>h("button",{class:"chip","aria-pressed":String(x.st===v),onclick:()=>updLog("sorry",x.id,{st:v},"sorries")},v)))))):h("div",{class:"empty"},"시말서가 없습니다"));
-  return [warnBanner(),k,h("div",{class:"grid g-today"},logCard,h("div",{class:"stack"},sorCard,card("바로가기",{},h("div",{class:"chips"},
-    [["햄찌스 인사 기록실","https://app.notion.com/p/3d8d0752db63818fb0d1f1e199b58860"],["지침 모음","https://app.notion.com/p/3ded0752db6381148db2c359a61a4d03"],["업무일지 표","https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5"],["시말서 표","https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"]]
+    h("div",{class:"chips"},["제출","대표님 확인","재발방지 완료"].map(v=>h("button",{class:"chip","aria-pressed":String(x.st===v),onclick:()=>updLog("sorry",x.id,{st:v},W.sor)},v)))))):h("div",{class:"empty"},"시말서가 없습니다"));
+  const who=h("div",{class:"seg",role:"group","aria-label":"직원"},Object.entries(STAFF).map(([id,o])=>h("button",{"aria-pressed":String(S.staff===id),onclick:()=>{S.staff=id;ls.set("desk:staff",id);render()}},`${o.n} ${(S.data[o.logs]||[]).filter(l=>!l.ev).length||""}`.trim())));
+  return [warnBanner(),who,k,h("div",{class:"grid g-today"},logCard,h("div",{class:"stack"},sorCard,card("바로가기",{},h("div",{class:"chips"},
+    [["햄찌스 인사 기록실","https://app.notion.com/p/3d8d0752db63818fb0d1f1e199b58860"],["지침 모음","https://app.notion.com/p/3ded0752db6381148db2c359a61a4d03"],["업무일지 표",W.logDb],["시말서 표",W.sorDb]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))))))];
 }
 function openLog(id,which){S.sel={kind:"log",id,which:which||"log"};if(S.pageText[id]==null){S.pageText[id]="loading";api("pageText",{id}).then(t=>{S.pageText[id]=t||"(본문 없음)"}).catch(e=>{S.pageText[id]="불러오지 못했습니다: "+e.message}).finally(render)}render()}
 function logSheet(){
-  const isS=S.sel.which==="sorry",x=byId(isS?(S.data.sorries||[]):(S.data.logs||[]),S.sel.id);if(!x){S.sel=null;return null}
+  const W=STAFF[S.staff]||STAFF.ham,isS=S.sel.which==="sorry",x=byId(S.data[isS?W.sor:W.logs]||[],S.sel.id);if(!x){S.sel=null;return null}
   const txt=S.pageText[x.id];
   return h("aside",{class:"sheet","aria-label":isS?"시말서":"업무일지"},h("header",null,h("b",null,isS?"시말서":"업무일지"),x.u?h("a",{class:"btn ghost sm",href:x.u,target:"_blank",rel:"noopener"},"노션에서 열기",ic("ext")):null,h("button",{class:"icon-btn","aria-label":"닫기",onclick:closeSheet},ic("x"))),
     h("div",{class:"bd"},h("textarea",{class:"title",rows:"2",readonly:true,value:x.t||""}),
       isS?[x.sum?h("div",{class:"field"},h("label",null,"사건 요약"),h("div",{class:"note"},x.sum)):null,x.fix?h("div",{class:"field"},h("label",null,"재발 방지책"),h("div",{class:"note"},x.fix)):null]:
-        h("div",{class:"field"},h("label",null,"대표님 평가"),h("div",{class:"chips"},["칭찬","보통","지적받음"].map(v=>h("button",{class:"chip","aria-pressed":String(x.ev===v),onclick:()=>updLog("log",x.id,{ev:x.ev===v?null:v},"logs")},v)))),
+        h("div",{class:"field"},h("label",null,"대표님 평가"),h("div",{class:"chips"},["칭찬","보통","지적받음"].map(v=>h("button",{class:"chip","aria-pressed":String(x.ev===v),onclick:()=>updLog("log",x.id,{ev:x.ev===v?null:v},W.logs)},v)))),
       h("div",{class:"field"},h("label",null,"본문"),txt==="loading"?h("div",{class:"note"},"불러오는 중…"):docView(txt||""))));
 }
 // 노션 본문(## 제목, • 목록 등)을 구역별로 나눠 보여 주기
@@ -2613,7 +2616,7 @@ function lock(){ls.del("desk:cfg");ls.del("desk:cache");S.cfg=null;S.data=null;S
 function navCounts(){if(!S.data)return{};const today=TODAY(),open=S.data.tasks.filter(t=>!isDone(t));
   const nb=newsByDay(),nd=Object.keys(nb).sort().reverse()[0];
   return{today:open.filter(t=>t.d&&dOf(t.d)<=today).length,work:open.length,life:(S.data.habits||[]).filter(x=>x.on!==false&&!hDates(x).includes(today)).length||"",pf:S.data.tasks.filter(t=>t.star).length,
-    news:nd===today?nb[nd].length:"",ham:(S.data.logs||[]).filter(l=>!l.ev).length||"",
+    news:nd===today?nb[nd].length:"",ham:[...(S.data.logs||[]),...(S.data.jpLogs||[])].filter(l=>!l.ev).length||"",
     acct:open.filter(t=>ACCT_Y.all.includes(t.y)).length||"",letter:open.filter(t=>t.p==="모두의 레터").length||"",job:(S.data.jobs||[]).filter(j=>!["합격","불합격","보류"].includes(j.st)).length||""}}
 function render(){
   const ae=document.activeElement,aeId=ae&&ae.id,selS=ae&&ae.selectionStart,selE=ae&&ae.selectionEnd;

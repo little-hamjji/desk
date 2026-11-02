@@ -22,6 +22,8 @@ const DB = {
   job:   'd242f23db7cd4f329a4f0cd84e1ef84e', // 이직 준비
   log:   'b5d849ec6f384340a436e579b21216f5', // 햄꾼 일일 업무일지
   sorry: '811a235fff054bf388139f6685f0b5f4', // 햄꾼 시말서
+  jplog: 'b09a05363d15437cbf02ef0030a0e11b', // 지피리 일일 업무일지
+  jpsorry: '678f0d66b2314290a7183528249e4202', // 지피리 시말서
   news:  '98b92fcd3e3945ee8a935ba09a06f6a1', // 이슈 팔로잉 아카이브(매일 뉴스 브리핑 메일)
   appr:  '6e0e599bc9b2409f9cbe09110028df29', // 이카운트 결재현황
   cash:  '538ee6b62ed74a47b12afbc6396d0cd6', // 출납부 미작성 지결
@@ -29,7 +31,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-02b'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-02c'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -311,7 +313,7 @@ const ACTIONS = {
   },
   // 공고 메일: 받은편지함 밖(라벨·보관)도 포함해 검색 조건으로 찾음. 개인 서버에서만 호출
   jobMail({ q }) {
-    return GmailApp.search('newer_than:30d ' + (q || 'subject:(공고알림 OR 공고 OR 채용 OR NGO)'), 0, 40).map(mailRow);
+    return GmailApp.search('newer_than:30d ' + (q || 'subject:(공고알림 OR 공고 OR 채용 OR NGO) -subject:입사지원서'), 0, 40).map(mailRow);
   },
   mailBody({ id }) {
     const th = GmailApp.getThreadById(id);
@@ -390,7 +392,7 @@ function scanList() {
 
 function loadNotion(today) {
     const since = addDays(today, -60);
-    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news, apprs, cashes, banks] = queryMany([
+    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news, apprs, cashes, banks, jpLogs, jpSorries] = queryMany([
       { db: DB.tasks, body: { filter: { or: [
         { property: '상태', status: { does_not_equal: '완료' } },
         { property: '날짜', date: { on_or_after: since } },
@@ -408,6 +410,8 @@ function loadNotion(today) {
       { db: DB.appr, opt: '이카운트 결재현황' },
       { db: DB.cash, opt: '출납부 미작성 지결' },
       { db: DB.bank, body: { filter: { property: '거래일', date: { on_or_after: addDays(today, -200) } } }, max: 1000, opt: '통장 검수' },
+      { db: DB.jplog, body: { page_size: 40, sorts: [{ property: '날짜', direction: 'descending' }] }, max: 40, opt: '지피리 업무일지' },
+      { db: DB.jpsorry, body: { page_size: 30, sorts: [{ property: '날짜', direction: 'descending' }] }, max: 30, opt: '지피리 시말서' },
     ]);
     const okDb = n => !WARN.some(w => w.indexOf(n) === 0); // 못 읽은 표는 빈 표로 보내지 않음
     return {
@@ -416,6 +420,8 @@ function loadNotion(today) {
       bankRows: okDb('통장 검수') ? banks.map(p => read('bank', p)) : undefined,
       syncMeta: JSON.parse(PropertiesService.getScriptProperties().getProperty('syncMeta') || '{}'),
       logs: logs.map(p => read('log', p)),
+      jpLogs: jpLogs.map(p => read('log', p)),
+      jpSorries: jpSorries.map(p => read('sorry', p)),
       sorries: sorries.map(p => read('sorry', p)),
       news: news.map(p => read('news', p)),
       warn: WARN.slice(),
