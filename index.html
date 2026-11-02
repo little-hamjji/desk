@@ -686,7 +686,13 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .mi{font-size:11px;padding:1px 4px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mi.ev{background:rgba(10,132,255,.2);color:#cfe5ff}
 .mi.t{color:var(--fg2)}.mi.t.hi{color:#ffb340}.mi.t.done{color:var(--fg3);text-decoration:line-through}
-.mi.more{color:var(--fg3)}
+.mi.more{color:var(--fg3);cursor:pointer}.mi.more:hover{color:var(--fg1,#fff)}.mcell .cnt{cursor:pointer}
+.daypop .dlist{display:grid;gap:4px;max-height:60vh;overflow:auto}
+.daypop .dr{all:unset;box-sizing:border-box;display:grid;gap:2px;padding:7px 9px;border-radius:8px;font-size:13px;min-width:0}
+.daypop .dr span{font-size:11.5px;color:var(--fg3)}
+.daypop .dr.ev{background:rgba(10,132,255,.2);color:#cfe5ff}
+.daypop button.dr{cursor:pointer;color:var(--fg2)}.daypop button.dr:hover,.daypop button.dr:focus-visible{background:rgba(255,255,255,.08)}
+.daypop .dr.hi{color:#ffb340}.daypop .dr.done b{color:var(--fg3);text-decoration:line-through}
 .mcell .cnt{display:none;font-size:10px;color:var(--fg3)}
 
 /* 계산기 */
@@ -2468,7 +2474,17 @@ function newsMini(){
 function warnBanner(){const w=S.data.warn||[];return w.length?h("div",{class:"banner"},"노션 연동이 일부 페이지에 연결되지 않았습니다: "+w.map(x=>x.split(":")[0]).join(", ")+" → 노션 「햄찌스」·「이슈 브리핑」 페이지 ··· → 연결에 연동을 추가해 주세요"):null}
 
 /* ═════════ 월간 캘린더 ═════════ */
-S.month=0;S.mAdd=null;
+S.month=0;S.mAdd=null;S.dayPop=null;
+// 「+N개」를 누르면 그날 일정·할 일 전체를 팝업으로
+function dayModal(){
+  const day=S.dayPop;if(!day||!S.data)return null;
+  const close=()=>{S.dayPop=null;render()},evs=eventsOn(day),ts=tasksOn(day).sort((a,b)=>(isDone(a)-isDone(b))||((a.r==="상")?-1:1));
+  return h("div",{class:"veil",onclick:e=>{if(e.target===e.currentTarget)close()}},h("div",{class:"diag daypop",role:"dialog","aria-label":`${fmtMD(day)} 세부 보기`},
+    h("div",{class:"row"},h("h3",{style:"flex:1"},`${fmtMD(day)} · ${evs.length+ts.length}개`),h("button",{class:"icon-btn","aria-label":"닫기",onclick:close},ic("x"))),
+    h("div",{class:"dlist"},
+      evs.map(e=>h("div",{class:"dr ev"},h("b",null,e.t),h("span",null,[e.all?"종일":tOf(e.s),e.cal,e.loc].filter(Boolean).join(" · ")))),
+      ts.map(t=>h("button",{class:"dr t"+(isDone(t)?" done":"")+(t.r==="상"&&!isDone(t)?" hi":""),onclick:()=>{S.dayPop=null;openSheet("tasks",t.id)}},h("b",null,(isDone(t)?"✓ ":"• ")+t.t),h("span",null,[tOf(t.d),t.p,t.s].filter(Boolean).join(" · ")))))));
+}
 function monthCard(){
   const now=new Date(),base=new Date(now.getFullYear(),now.getMonth()+S.month,1),today=TODAY();
   const first=ymd(base),start=monOf(first),lastDay=new Date(base.getFullYear(),base.getMonth()+1,0);
@@ -2480,8 +2496,8 @@ function monthCard(){
       items.slice(0,4).map(x=>x.e?h("div",{class:"mi ev",title:x.e.t},(x.e.all?"":tOf(x.e.s)+" ")+x.e.t):
         h("div",{class:"mi t"+(isDone(x.t)?" done":"")+(x.t.r==="상"&&!isDone(x.t)?" hi":""),title:x.t.t,draggable:"true",
           ondragstart:e=>e.dataTransfer.setData("text/task",x.t.id),onclick:e=>{e.stopPropagation();openSheet("tasks",x.t.id)}},(isDone(x.t)?"✓ ":"• ")+x.t.t)),
-      items.length>4?h("div",{class:"mi more"},`+${items.length-4}개`):null,
-      items.length?h("span",{class:"cnt"},`${items.length}개`):null,
+      items.length>4?h("div",{class:"mi more",role:"button",tabindex:"0","aria-label":`${fmtMD(day)} 일정 전체 보기`,onclick:e=>{e.stopPropagation();S.dayPop=day;render()},onkeydown:e=>{if(e.key==="Enter"){S.dayPop=day;render()}}},`+${items.length-4}개`):null,
+      items.length?h("span",{class:"cnt",onclick:e=>{e.stopPropagation();S.dayPop=day;render()}},`${items.length}개`):null,
       S.mAdd===day?h("input",{class:"in add-in",id:"madd",placeholder:"할 일 + Enter",onclick:e=>e.stopPropagation(),onkeydown:e=>{if(e.key==="Enter"&&!e.isComposing&&e.target.value.trim()){const P=parseQuick(e.target.value);S.mAdd=null;addTask({t:P.t,d:P.time?`${day}T${P.time}:00+09:00`:day,r:P.r,p:P.p})}else if(e.key==="Escape"){S.mAdd=null;render()}},
         onblur:()=>setTimeout(()=>{if(S.mAdd===day){S.mAdd=null;render()}},150)}):null);
     cells.push(dropZone(cell,id=>{const t=byId(S.data.tasks,id);if(!t||dOf(t.d)===day)return;const tm=tOf(t.d);updTask(id,{d:tm?`${day}T${tm}:00+09:00`:day},`${fmtMD(day)}로 옮겼습니다`)}));}
@@ -2795,7 +2811,7 @@ function render(){
   let content;try{content=(views[S.view]||viewToday)()}catch(e){console.error(e);content=h("div",{class:"banner"},"이 화면을 그리는 중 문제가 생겼습니다: "+e.message)}
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
   if(S.view!=="pf"&&PF.story!=null)storyClose();
-  fill(layer,...[apprModal(),withGrip(sheetView()),paletteView(),quickModal(),diagView()].filter(Boolean));
+  fill(layer,...[apprModal(),withGrip(sheetView()),dayModal(),paletteView(),quickModal(),diagView()].filter(Boolean));
   fill($("#rail"),railView());renderSync();musicUI();restore();
   function restore(){if(!aeId)return;const el=document.getElementById(aeId);if(el&&el!==document.activeElement){el.focus();try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
@@ -2820,7 +2836,7 @@ document.addEventListener("keydown",e=>{
     if(k==="ArrowRight"||k===" "||k==="PageDown"){storyGo(PF.story+1);e.preventDefault();return}if(k==="ArrowLeft"||k==="PageUp"){storyGo(PF.story-1);e.preventDefault();return}}
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();S.palette?(S.palette=null,render()):openPalette();return}
-  if(e.key==="Escape"){if(S.quick){S.quick=false;render()}else if(S.diag){S.diag=null;render()}else if(S.palette){S.palette=null;render()}else if(S.sel){closeSheet()}else if(typing)document.activeElement.blur();return}
+  if(e.key==="Escape"){if(S.dayPop){S.dayPop=null;render()}else if(S.quick){S.quick=false;render()}else if(S.diag){S.diag=null;render()}else if(S.palette){S.palette=null;render()}else if(S.sel){closeSheet()}else if(typing)document.activeElement.blur();return}
   if(typing||e.metaKey||e.ctrlKey||e.altKey||!S.data)return;
   if(e.key==="n"||e.key==="ㅜ"){e.preventDefault();openQuick("task")}
   else if(e.key==="m"||e.key==="ㅡ"){e.preventDefault();openQuick("memo")}
