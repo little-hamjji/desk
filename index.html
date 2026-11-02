@@ -418,6 +418,28 @@ tr.cur td{background:rgba(10,132,255,.1)}
 .appr-d{display:flex;gap:8px;align-items:center;font-size:12px}
 /* 현금출납부 → 미작성 지결 */
 .cash{display:grid;gap:6px;max-height:900px;overflow:auto}
+.staffs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.staff{--c:#ffd60a;display:grid;gap:10px;padding:14px 16px 14px 18px;position:relative;overflow:hidden;cursor:pointer;border-radius:var(--r);border:.5px solid var(--line);background:rgba(255,255,255,.04);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);min-width:0}
+.staff.jp{--c:#30d158}
+.staff::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+.staff.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.staff.off{opacity:.62}
+.staff .who{display:flex;align-items:center;gap:8px}
+.staff .who b{color:var(--c);font-size:16px}
+.staff .emo{font-size:22px;line-height:1}
+.staff .st{margin-left:auto;font-size:12px;color:var(--fg2)}
+.staff .lb{display:flex;justify-content:space-between;font-size:12px;color:var(--fg2)}
+.staff .lb b{color:var(--fg)}
+.staff .tr{height:5px;border-radius:3px;background:rgba(118,118,128,.25);margin-top:5px;overflow:hidden}
+.staff .tr i{display:block;height:100%;background:var(--c)}
+.staff small{display:block;margin-top:3px;font-size:11px;color:var(--fg3)}
+.staff .ctl{display:flex;align-items:center;gap:10px}
+.wheel{flex:1;min-width:0;height:66px;overflow-y:auto;scroll-snap-type:y mandatory;border-radius:9px;background:rgba(118,118,128,.14);display:flex;flex-direction:column;scrollbar-width:none}
+.wheel::-webkit-scrollbar{display:none}
+.wheel .pad{flex:0 0 22px}
+.wheel button{flex:0 0 22px;border:0;background:transparent;color:var(--fg3);font-size:12.5px;scroll-snap-align:center;cursor:pointer}
+.wheel button.on{color:var(--c);font-weight:700}
+@media(max-width:700px){.staffs{grid-template-columns:minmax(0,1fr)}}
 .bk-l{display:grid;gap:6px}
 .bk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:9px 12px;border:.5px solid var(--line);border-radius:10px;align-items:center}
 .bk.ok{opacity:.6}
@@ -2447,10 +2469,22 @@ function monthCard(){
 
 /* ═════════ 햄찌스 오피스: 직원별 업무일지·시말서 ═════════ */
 S.pageText={};S.staff=ls.get("desk:staff","ham");
-const STAFF={ham:{n:"햄꾼",logs:"logs",sor:"sorries",page:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",logDb:"https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5",sorDb:"https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"},
-  jp:{n:"지피리",logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
+const STAFF={ham:{n:"햄꾼",emo:"🐹",vers:["Opus 5.5","Sonnet 5.5","Haiku 5.5","Fable 5.1"],logs:"logs",sor:"sorries",page:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",logDb:"https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5",sorDb:"https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"},
+  jp:{n:"지피리",emo:"🤖",vers:["gpt-6.1-sol"],logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
 const EVCLS={"칭찬":"blue","보통":"","지적받음":"red"};
 function updLog(kind,id,fields,listKey){return mutate(D=>Object.assign(byId(D[listKey],id),fields),()=>api("update",{kind,id,fields}),"저장했습니다")}
+// 직원 카드: 근무 상태·사용량·버전의 원본은 노션 「직원 상태」. 사용량은 자동 수집이 없어 확인한 값만 표시
+function staffPick(id,v){const o=STAFF[id],x=(S.data.staff||[]).find(r=>r.n===o.n);if(!x||x.ver===v)return;mutate(D=>{D.staff.find(r=>r.n===o.n).ver=v},()=>api("update",{kind:"staff",id:x.id,fields:{ver:v}}),`${o.n} 버전을 ${v}(으)로 저장했습니다`)}
+function staffCard(id){
+  const o=STAFF[id],x=(S.data.staff||[]).find(r=>r.n===o.n)||{},on=x.st!=="휴식",left=x.left,sel=S.staff===id,ver=x.ver||o.vers[0],vers=o.vers.includes(ver)?o.vers:[ver,...o.vers];
+  const wheel=h("div",{class:"wheel",role:"listbox","aria-label":o.n+" 버전",tabindex:"0"},h("span",{class:"pad"}),vers.map(v=>h("button",{class:v===ver?"on":"",role:"option","aria-selected":String(v===ver),"data-v":v,onclick:e=>{e.stopPropagation();staffPick(id,v)}},v)),h("span",{class:"pad"}));
+  let t;wheel.addEventListener("scroll",()=>{clearTimeout(t);t=setTimeout(()=>{const mid=wheel.scrollTop+wheel.clientHeight/2,b=[...wheel.querySelectorAll("button")].find(el=>Math.abs(el.offsetTop-wheel.offsetTop+el.offsetHeight/2-mid)<=el.offsetHeight/2);if(b)staffPick(id,b.dataset.v)},350)});
+  setTimeout(()=>{const b=wheel.querySelector("button.on");if(b)wheel.scrollTop=b.offsetTop-wheel.offsetTop-(wheel.clientHeight-b.offsetHeight)/2},0);
+  return h("section",{class:"staff "+id+(sel?" sel":"")+(on?"":" off"),role:"button",tabindex:"0","aria-pressed":String(sel),onclick:()=>{S.staff=id;ls.set("desk:staff",id);render()},onkeydown:e=>{if(e.key==="Enter"&&e.target===e.currentTarget){S.staff=id;ls.set("desk:staff",id);render()}}},
+    h("div",{class:"who"},h("span",{class:"emo"},o.emo),h("b",null,o.n),h("span",{class:"st"},on?"근무 중":"휴식 중")),
+    h("div",{class:"use"},h("div",{class:"lb"},h("span",null,"남은 사용량"),h("b",{class:"num"},left==null?"미확인":left+"%")),h("div",{class:"tr"},h("i",{style:`width:${left==null?0:Math.max(0,Math.min(100,left))}%`})),x.at?h("small",null,x.at+" 확인"):null),
+    h("div",{class:"ctl"},wheel,h("button",{class:"btn sm"+(on?"":" pri"),disabled:x.id?null:"disabled",onclick:e=>{e.stopPropagation();const st=on?"휴식":"근무";mutate(D=>{D.staff.find(r=>r.n===o.n).st=st},()=>api("update",{kind:"staff",id:x.id,fields:{st}}),`${o.n}: ${st}`)}},on?"쉬게 하기":"일하게 하기")));
+}
 function viewHam(){
   const W=STAFF[S.staff]||STAFF.ham,logs=S.data[W.logs]||[],sor=S.data[W.sor]||[],ym=TODAY().slice(0,7),thisM=logs.filter(l=>(dOf(l.d)||"").startsWith(ym));
   const k=h("div",{class:"kpis"},kpi("이번 달 업무일지",thisM.length,"건",""),kpi("칭찬",thisM.filter(l=>l.ev==="칭찬").length,"번",""),kpi("지적받음",thisM.filter(l=>l.ev==="지적받음").length,"번",""),
@@ -2464,7 +2498,7 @@ function viewHam(){
       h("p",null,h("b",null,x.d?fmtMD(dOf(x.d)):"")," ",x.t," ",x.sev?h("span",{class:"pill "+(x.sev==="중대"?"red":x.sev==="보통"?"orange":"")},x.sev):null),
       h("div",{class:"meta"},x.cat?h("span",null,x.cat):null,h("span",null,x.sum||""))),
     h("div",{class:"chips"},["제출","대표님 확인","재발방지 완료"].map(v=>h("button",{class:"chip","aria-pressed":String(x.st===v),onclick:()=>updLog("sorry",x.id,{st:v},W.sor)},v)))))):h("div",{class:"empty"},"시말서가 없습니다"));
-  const who=h("div",{class:"seg",role:"group","aria-label":"직원"},Object.entries(STAFF).map(([id,o])=>h("button",{"aria-pressed":String(S.staff===id),onclick:()=>{S.staff=id;ls.set("desk:staff",id);render()}},`${o.n} ${(S.data[o.logs]||[]).filter(l=>!l.ev).length||""}`.trim())));
+  const who=h("div",{class:"staffs"},Object.keys(STAFF).map(staffCard));
   return [warnBanner(),who,k,h("div",{class:"grid g-today"},logCard,h("div",{class:"stack"},sorCard,card("바로가기",{},h("div",{class:"chips"},
     [["햄찌스 인사 기록실","https://app.notion.com/p/3d8d0752db63818fb0d1f1e199b58860"],["지침 모음","https://app.notion.com/p/3ded0752db6381148db2c359a61a4d03"],["업무일지 표",W.logDb],["시말서 표",W.sorDb]]
       .map(([n,u])=>h("a",{class:"chip",href:u,target:"_blank",rel:"noopener",style:"text-decoration:none"},n))))))];
@@ -2665,7 +2699,7 @@ function lock(){ls.del("desk:cfg");ls.del("desk:cache");S.cfg=null;S.data=null;S
 function navCounts(){if(!S.data)return{};const today=TODAY(),open=S.data.tasks.filter(t=>!isDone(t));
   const nb=newsByDay(),nd=Object.keys(nb).sort().reverse()[0];
   return{today:open.filter(t=>t.d&&dOf(t.d)<=today).length,work:open.length,life:(S.data.habits||[]).filter(x=>x.on!==false&&!hDates(x).includes(today)).length||"",pf:S.data.tasks.filter(t=>t.star).length,
-    news:nd===today?nb[nd].length:"",ham:[...(S.data.logs||[]),...(S.data.jpLogs||[])].filter(l=>!l.ev).length||"",
+    news:nd===today?nb[nd].length:"",ham:"",
     acct:open.filter(t=>ACCT_Y.all.includes(t.y)).length||"",letter:open.filter(t=>t.p==="모두의 레터").length||"",job:(S.data.jobs||[]).filter(j=>!["합격","불합격","보류"].includes(j.st)).length||""}}
 function render(){
   const ae=document.activeElement,aeId=ae&&ae.id,selS=ae&&ae.selectionStart,selE=ae&&ae.selectionEnd;
