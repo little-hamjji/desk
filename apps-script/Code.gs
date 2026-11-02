@@ -28,7 +28,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-10-30f'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-02a'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -152,7 +152,7 @@ const MAP = {
            r: ['우선순위', 'select'], c: ['분류', 'select'], star: ['⭐ 포트폴리오', 'check'], detail: ['세부 업무', 'text'], note: ['비고', 'text'], out: ['성과·산출물', 'text'] },
   habit: { n: ['습관', 'title'], i: ['아이콘', 'text'], o: ['순서', 'num'], on: ['사용', 'check'], g: ['주간 목표', 'num'], dates: ['체크 날짜', 'text'] },
   memo:  { t: ['내용', 'title'], k: ['종류', 'select'], pin: ['고정', 'check'], st: ['상태', 'select'], at: ['작성', null] },
-  job:   { n: ['지원처', 'title'], role: ['직무', 'text'], st: ['단계', 'select'], d: ['마감', 'date'], link: ['링크', 'url'], memo: ['메모', 'text'] },
+  job:   { n: ['지원처', 'title'], role: ['직무', 'text'], st: ['단계', 'select'], d: ['마감', 'date'], link: ['링크', 'url'], memo: ['메모', 'text'], chk: ['진행 체크', 'text'], post: ['공고 내용', 'text'] },
   att:   { t: ['내용', 'title'], type: ['유형', 'select'], d: ['날짜', 'date'], w15: ['평일 연장(1.5배)', 'num'], w2: ['평일 야간(2배)', 'num'],
            h15: ['휴일근로(1.5배)', 'num'], h2: ['휴일연장(2배)', 'num'], h25: ['휴일야간(2.5배)', 'num'], days: ['휴가 일수', 'num'],
            reason: ['야근사유', 'text'], bonus: ['할증 시간', null], month: ['월', 'rel'], year: ['연도', 'rel'] },
@@ -306,6 +306,10 @@ const ACTIONS = {
     else throw new Error('알 수 없는 메일 동작');
     return { id, op };
   },
+  // 공고 메일: 받은편지함 밖(라벨·보관)도 포함해 검색 조건으로 찾음. 개인 서버에서만 호출
+  jobMail({ q }) {
+    return GmailApp.search('newer_than:30d ' + (q || 'subject:(공고알림 OR 공고 OR 채용 OR NGO)'), 0, 40).map(mailRow);
+  },
   mailBody({ id }) {
     const th = GmailApp.getThreadById(id);
     if (!th) throw new Error('메일을 찾지 못했습니다');
@@ -357,12 +361,13 @@ function thumbOf(t) { t = t || {}; return (t.medium || t.default || t.high || {}
 
 // 받은편지함 최근 30개 대화
 function mailList() {
-  return GmailApp.search('in:inbox -from:' + SCAN_FROM, 0, 30).map(th => {
-    const m = th.getMessages().slice(-1)[0];
-    return { id: th.getId(), subj: th.getFirstMessageSubject() || '(제목 없음)', from: m.getFrom().replace(/<.*>/, '').replace(/"/g, '').trim() || m.getFrom(),
-      at: th.getLastMessageDate().toISOString(), snip: m.getPlainBody().replace(/\s+/g, ' ').slice(0, 140),
-      unread: th.isUnread(), star: th.hasStarredMessages(), imp: th.isImportant(), n: th.getMessageCount() };
-  });
+  return GmailApp.search('in:inbox -from:' + SCAN_FROM, 0, 30).map(mailRow);
+}
+function mailRow(th) {
+  const m = th.getMessages().slice(-1)[0];
+  return { id: th.getId(), subj: th.getFirstMessageSubject() || '(제목 없음)', from: m.getFrom().replace(/<.*>/, '').replace(/"/g, '').trim() || m.getFrom(),
+    at: th.getLastMessageDate().toISOString(), snip: m.getPlainBody().replace(/\s+/g, ' ').slice(0, 140),
+    unread: th.isUnread(), star: th.hasStarredMessages(), imp: th.isImportant(), n: th.getMessageCount() };
 }
 
 // 스캔 메일(회사 복합기 → chlee@hamkke.org) 최근 120일
