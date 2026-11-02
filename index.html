@@ -2037,6 +2037,10 @@ function bankMatch(txs,ledger){
   // 출납부 1건 = 통장 여러 건
   L.forEach(b=>{if(b.used||b.amt<=0)return;const pool=T.filter(a=>!a.used&&Math.abs(bankDays(b.d,a.d))<=14&&same(a,b));
     const hit=bankSubset(pool,b.amt);if(hit){b.used=true;hit.forEach(a=>{a.used=true;a.ls=[b.l]})}});
+  // 출납부 일괄 1줄 = 통장에서 같은 분에 함께 나간 개별 이체 전체(사람별 지급+원천세). 일부만 맞는 경우는 묶지 않음
+  const byMin={};T.forEach(a=>{if(!a.used&&a.amt>0&&!/일괄/.test(a.t.memo)&&!/체크/.test(a.t.kind))(byMin[a.t.at.slice(0,16)]=byMin[a.t.at.slice(0,16)]||[]).push(a)});
+  Object.values(byMin).filter(g=>g.length>=2).forEach(g=>{const sum=g.reduce((s,a)=>s+a.amt,0),l=L.find(b=>!b.used&&b.amt===sum&&/일괄/.test(b.l.vendor)&&Math.abs(bankDays(b.d,g[0].d))<=7);
+    if(l){l.used=true;g.forEach(a=>{a.used=true;a.ls=[l.l];a.sum=true})}});
   const from=txs[0]&&txs[0].d,to=txs.length?txs[txs.length-1].d:null;
   return {T:T.filter(a=>a.t.out||a.t.in),matched:T.filter(a=>a.ls.length).length,total:T.length,
     ledgerOnly:L.filter(b=>!b.used&&b.d>=from&&b.d<=to).map(b=>b.l)};
@@ -2046,17 +2050,18 @@ const bankNo=s=>String(s||"").replace(/\s/g,"");
 function bankReview(m,ledger,appr){
   const ap=new Map((appr||[]).map(r=>[bankNo(r.no),r])),won=v=>bankNum(v),sum={};
   ledger.forEach(l=>{const n=bankNo(l.no);if(n)sum[n]=(sum[n]||0)+l.amt});
-  return m.T.map(({t,ls})=>{
+  const open=m.ledgerOnly.filter(l=>l.amt>0&&/일괄/.test(l.vendor));
+  return m.T.map(({t,ls,sum:joined})=>{
     const flags=[],no=[...new Set(ls.map(l=>bankNo(l.no)).filter(Boolean))],tx=t.out||t.in;
     let a=no.map(n=>ap.get(n)).find(Boolean),by=a?"번호":"";
     if(!a&&t.out)a=(appr||[]).find(r=>won(r.amt)===t.out),by=a?"금액":"";
-    if(!ls.length)flags.push("출납부 없음");
+    if(!ls.length){const near=/일괄/.test(t.memo)&&open.find(l=>Math.abs(bankDays(l.d,t.d))<=7&&Math.abs(l.amt-t.out)/l.amt<=.15);flags.push(near?`금액 다름: 출납부 ${near.row}행 ${near.amt.toLocaleString()} / 통장 ${t.out.toLocaleString()}`:"출납부 없음")}
     else if(!no.length&&t.out)flags.push("결의서번호 빈칸");
     const far=ls.length?Math.max(...ls.map(l=>Math.abs(bankDays(l.d,t.d)))):0;if(far>3)flags.push(`날짜 ${far}일 차이`);
     if(t.out&&!a&&no.length)flags.push("결재현황에서 기안 못 찾음");else if(t.out&&!a)flags.push("결재현황에 없음");
     if(a&&!/^결재$|완료/.test(a.st||""))flags.push("결재 "+(a.st||"상태 미상"));
     if(a&&by==="번호"&&won(a.amt)&&sum[bankNo(a.no)]!==undefined&&won(a.amt)!==sum[bankNo(a.no)])flags.push(`금액 차이: 지결 ${won(a.amt).toLocaleString()} / 출납부 ${sum[bankNo(a.no)].toLocaleString()}`);
-    return {k:bankKey(t),at:t.at,d:t.d,memo:t.memo,kind:t.kind,out:t.out,in:t.in,bal:t.bal,by,flags,
+    return {k:bankKey(t),at:t.at,d:t.d,memo:t.memo,kind:t.kind,out:t.out,in:t.in,bal:t.bal,by,flags,joined:!!joined,
       ls:ls.map(l=>({row:l.row,d:l.d,amt:l.amt,vendor:l.vendor,memo:l.memo.slice(0,70),no:l.no})),ap:a?{no:a.no,title:a.title,st:a.st,amt:a.amt}:null};
   }).reverse();
 }
@@ -2119,7 +2124,7 @@ function bankRow(r,B){
   return h("div",{class:"bk"+(st==="ok"?" ok":st==="hold"?" hold":"")},
     h("div",{class:"bk-m",role:"button",tabindex:"0","aria-expanded":String(open),onclick:()=>{S.bankUI.open[r.k]=!open;render()},onkeydown:e=>{if(e.key==="Enter"){S.bankUI.open[r.k]=!open;render()}}},
       h("span",{class:"faint num",style:"font-size:12px"},fmtMD(r.d)),h("b",{class:"bk-t"},r.memo||r.kind),h("b",{class:"num"},(r.out?"-":"+")+won(r.out||r.in)),
-      h("div",{class:"bk-cs"},r.ls.length?chip("g",`출납부 ${r.ls.length}행`):chip("r","출납부 없음"),
+      h("div",{class:"bk-cs"},r.ls.length?chip(r.joined?"o":"g",r.joined?`출납부 ${r.ls[0].row}행 합계로 연결`:`출납부 ${r.ls.length}행`):chip("r","출납부 없음"),
         r.out?(no?chip("g","번호 "+no):chip("o","번호 빈칸")):null,
         r.out?(r.ap?chip(r.by==="번호"?"g":"o",`지결 ${r.ap.no}${r.by==="금액"?" (금액으로 찾음)":""}`):chip("o","결재현황에 없음")):null)),
     h("div",{class:"bk-a"},h("button",{class:"btn sm"+(st==="ok"?" go":""),"aria-pressed":String(st==="ok"),onclick:()=>bankSet(r.k,"ok")},st==="ok"?"확인함":"확인"),
