@@ -1181,11 +1181,11 @@ function confirmBtn(label,fn){const b=h("button",{class:"icon-btn",title:label,"
 function viewLife(){
   const today=TODAY(),evs=allEvents().filter(e=>(e.all?(e.e||e.s):dOf(e.s))>=today).sort((a,b)=>a.s<b.s?-1:1).slice(0,40);
   const byDay={};evs.forEach(e=>{const k=e.all&&e.s<today?today:dOf(e.s);(byDay[k]=byDay[k]||[]).push(e)});
-  const cal=card("개인 일정",{icon:"cal",count:"구글 캘린더",right:h("a",{class:"btn ghost sm",href:"https://calendar.google.com",target:"_blank",rel:"noopener"},"캘린더 열기",ic("ext"))},
+  const cal=card("개인 일정",{icon:"cal",count:"구글 캘린더",cls:"pj-done",right:h("a",{class:"btn ghost sm",href:"https://calendar.google.com",target:"_blank",rel:"noopener"},"캘린더 열기",ic("ext"))},
     S.data.calError?h("div",{class:"banner"},"캘린더를 읽지 못했습니다: "+S.data.calError):null,
-    Object.keys(byDay).length?h("div",null,Object.keys(byDay).sort().slice(0,14).map(k=>h("div",null,h("div",{class:"sec-t"},rel(k)+" · "+fmtMD(k)),byDay[k].map(e=>evRow(e,new Date()))))):h("div",{class:"empty"},"다가오는 일정이 없습니다"),
+    Object.keys(byDay).length?h("div",{class:"pj-scroll"},Object.keys(byDay).sort().slice(0,14).map(k=>h("div",null,h("div",{class:"sec-t"},rel(k)+" · "+fmtMD(k)),byDay[k].map(e=>evRow(e,new Date()))))):h("div",{class:"empty"},"다가오는 일정이 없습니다"),
     h("div",{class:"faint",style:"font-size:12px"},"새 일정은 오늘 화면 입력칸에서 「일정」을 고르고 \"다음주 화요일 2시 미팅\"처럼 적으면 됩니다"));
-  return [h("div",{class:"grid g2"},habitsCard(false),cal),h("div",{class:"grid g2"},stocksCard(),mailCard("main")),memoCard(0)];
+  return [h("div",{class:"grid g2"},h("div",{class:"stack"},habitsCard(false),stocksCard(),mailCard("main")),cal),memoCard(0)];
 }
 function jobsCard(){
   const js=S.data.jobs||[],main=STAGES.slice(0,5),rest=STAGES.slice(5);
