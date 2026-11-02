@@ -136,8 +136,13 @@ select.in{padding-right:24px}
 /* 큰 제목 */
 .hero{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .hero h2{margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em}
-.hero .motto{margin-top:6px;font-size:13px;line-height:1.6;color:var(--fg2)}
-.hero .motto p{margin:0}
+.quick-row{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+.quick-row>*{min-height:104px;align-content:center}
+.quick-row .quick{padding:14px 16px}
+.motto{display:grid;gap:6px;background:var(--card);border:.5px solid var(--line);border-radius:var(--r);padding:14px 18px;font-size:13px;line-height:1.6;color:var(--fg2)}
+.motto p{margin:0}
+.motto p:first-child{color:var(--fg);font-weight:600;font-size:14px}
+@media(max-width:700px){.quick-row{grid-template-columns:minmax(0,1fr)}.quick-row>*{min-height:0}}
 .hero .clock{font-family:var(--num);font-size:30px;font-weight:300;color:var(--fg2);font-variant-numeric:tabular-nums}
 .hero .sum{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .stat{display:grid;padding:8px 14px;border-radius:10px;background:var(--card);border:.5px solid var(--line);min-width:88px;text-align:left;cursor:pointer}
@@ -978,8 +983,7 @@ function viewToday(){
     stat("결정 대기",decs.length,decs.length?"orange":"",()=>jump("card-dec")),
     stat("7일 안",wk,"",()=>{S.view="work";render()}));
   const hero=h("div",{class:"hero"},h("div",null,h("div",{class:"faint",style:"font-size:13px;font-weight:600"},`${now.getFullYear()}년 · ${greet(now)}`),
-    h("h2",null,`${now.getMonth()+1}월 ${now.getDate()}일 ${WD[now.getDay()]}요일`),
-    h("div",{class:"motto"},h("p",null,"세상을 다정에 담아 더 행복해지기를"),h("p",null,"Take time to deliberate, but when the time for action comes, stop thinking and go in"))),h("span",{class:"clock",id:"clock"},`${pad(now.getHours())}:${pad(now.getMinutes())}`),wxBox(),sum);
+    h("h2",null,`${now.getMonth()+1}월 ${now.getDate()}일 ${WD[now.getDay()]}요일`)),h("span",{class:"clock",id:"clock"},`${pad(now.getHours())}:${pad(now.getMinutes())}`),wxBox(),sum);
 
   // 다가오는 마감
   const dl=open.filter(t=>t.d&&(t.r==="상"||isDec(t))&&dOf(t.d)>=today&&dOf(t.d)<=addD(today,30)).sort((a,b)=>a.d<b.d?-1:1).slice(0,12);
@@ -1000,7 +1004,7 @@ function viewToday(){
     decs.length?h("div",{class:"list"},decs.sort((a,b)=>({"상":0,"중":1,"하":2}[a.r]??3)-({"상":0,"중":1,"하":2}[b.r]??3)).map(t=>taskRow(t,{strip:true,quickToday:false}))):h("div",{class:"empty"},"지금 결정할 일이 없습니다"));
 
   const right=h("div",{class:"stack"},dec,scanCard(),mailCard("work"),newsMini(),habitsCard(true),memoCard(5));
-  return [hero,quickAdd(),ddays,h("div",{class:"grid g-today"},left,right),weekCard(),monthCard(),projectsCard()];
+  return [hero,h("div",{class:"quick-row"},quickAdd(),h("div",{class:"motto"},h("p",null,"세상을 다정에 담아 더 행복해지기를"),h("p",null,"Take time to deliberate, but when the time for action comes, stop thinking and go in"))),ddays,h("div",{class:"grid g-today"},left,right),weekCard(),monthCard(),projectsCard()];
 }
 const greet=d=>{const H=d.getHours();return H<11?"좋은 아침입니다":H<14?"점심 맛있게 드세요":H<18?"오후도 힘내세요":"오늘도 수고 많으셨습니다"};
 function stat(label,n,cls,on){return h("button",{class:"stat "+cls,onclick:on},h("b",null,n),h("span",null,label))}
