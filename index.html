@@ -2481,7 +2481,7 @@ function monthCard(){
 /* ═════════ 햄찌스 오피스: 직원별 업무일지·시말서 ═════════ */
 S.pageText={};S.staff=ls.get("desk:staff","ham");
 const STAFF={ham:{n:"햄꾼",emo:"🐹",vers:["Opus 5.5","Sonnet 5.5","Haiku 5.5","Fable 5.1"],can:["조사·문서·코드 작성","노션·구글 캘린더·드라이브","크롬 조작, 파일 처리","지피리 호출·결과 대조"],logs:"logs",sor:"sorries",page:"https://app.notion.com/p/3d8d0752db6381ef9e26e75cae3a10aa",logDb:"https://app.notion.com/p/b5d849ec6f384340a436e579b21216f5",sorDb:"https://app.notion.com/p/811a235fff054bf388139f6685f0b5f4"},
-  jp:{n:"지피리",emo:"🤖",vers:["gpt-6.1-sol"],can:["검수·교차 검토","조사·초안·코드 작업","노션 연결(승인 후)","민감 원본은 열지 않음"],logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
+  jp:{n:"지피리",emo:"🤖",vers:["gpt-6.1-sol","gpt-6.1-terra","gpt-6-astra","gpt-6-sol","gpt-6-luna","gpt-5.6-sol","gpt-5.6-terra","gpt-5.6-luna"],can:["검수·교차 검토","조사·초안·코드 작업","노션 연결(승인 후)","민감 원본은 열지 않음"],logs:"jpLogs",sor:"jpSorries",page:"https://app.notion.com/p/40cd0752db638138b912f93fe5c8db19",logDb:"https://app.notion.com/p/b09a05363d15437cbf02ef0030a0e11b",sorDb:"https://app.notion.com/p/678f0d66b2314290a7183528249e4202"}};
 const EVCLS={"칭찬":"blue","보통":"","지적받음":"red"};
 function updLog(kind,id,fields,listKey){return mutate(D=>Object.assign(byId(D[listKey],id),fields),()=>api("update",{kind,id,fields}),"저장했습니다")}
 // 오른쪽 직원 관리: 원본은 노션 「직원 상태」. 사용량은 확인한 값만 표시
