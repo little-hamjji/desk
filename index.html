@@ -861,6 +861,9 @@ const STATUS=["시작 전","진행 중","대기","완료"];
 const STAGES=["관심","서류 준비","지원 완료","면접","합격","불합격","보류"];
 const PCOL={"성과공유회":"var(--orange)","모두의 멘토링":"var(--blue)","1차년도 연차평가":"var(--purple)","2차년도 심사·조정":"var(--yellow)","운영위원회":"var(--brown)","1차년도 종료·정산":"var(--green)","멘토 감사장":"var(--pink)","일상 운영":"var(--gray)","모두의 아카데미":"var(--teal)","모두의 레터":"var(--mint)","모두의공모 사업 기획":"var(--indigo)","찾아가는 사업설명회":"#5ac8a8","하이플라이어스":"#c58af9","2차년도 회계":"#34c7a0"};
 const TCOL={"예산·회계":"var(--green)","행정·공문":"var(--gray)","평가·심사":"var(--purple)","멘토링 운영":"var(--blue)","행사 기획·운영":"var(--orange)","기관 관리":"var(--brown)","홍보·콘텐츠":"var(--pink)","업무 자동화·도구":"var(--red)"};
+// 노션에서 새로 생긴 프로젝트도 목록에 넣음(원본은 노션 할 일의 프로젝트 값이라 다른 기기에도 그대로 보임)
+const PNEW=["var(--teal)","var(--indigo)","var(--mint)","#5ac8a8","#c58af9","#34c7a0","var(--pink)","var(--orange)"];
+function syncProjects(names){(names||(S.data&&S.data.tasks||[]).map(t=>t.p)).forEach(p=>{if(!p)return;if(!PROJECTS.includes(p))PROJECTS.push(p);if(!PCOL[p])PCOL[p]=PNEW[[...p].reduce((a,c)=>a+c.codePointAt(0),0)%PNEW.length]})}
 const SCOL={"관심":"var(--gray)","서류 준비":"var(--yellow)","지원 완료":"var(--blue)","면접":"var(--purple)","합격":"var(--green)","불합격":"var(--red)","보류":"var(--brown)"};
 
 /* ═════════ 상태 ═════════ */
@@ -1807,7 +1810,12 @@ function sheetView(){
   const t=byId(S.data.tasks,S.sel.id);if(!t){S.sel=null;return null}
   const today=TODAY(),dd=dOf(t.d),tm=tOf(t.d)||"";
   const setDate=(d,time)=>updTask(t.id,{d:d?(time?`${d}T${time}:00+09:00`:d):null});
-  const chips=(label,opts,val,on,colors)=>h("div",{class:"field"},h("label",null,label),h("div",{class:"chips"},opts.map(o=>h("button",{class:"chip","aria-pressed":String(val===o),onclick:()=>on(val===o?null:o)},colors&&colors[o]?h("i",{style:`display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:${colors[o]}`}):null,o))));
+  const chips=(label,opts,val,on,colors,extra)=>h("div",{class:"field"},h("label",null,label),h("div",{class:"chips"},opts.map(o=>h("button",{class:"chip","aria-pressed":String(val===o),onclick:()=>on(val===o?null:o)},colors&&colors[o]?h("i",{style:`display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:${colors[o]}`}):null,o)),extra));
+  // 새 프로젝트: 노션 선택지는 처음 저장할 때 자동으로 생김
+  const addProj=()=>{const v=(S.drafts["sh-newp"]||"").trim();if(!v)return;S.drafts["sh-newp"]="";S.addProj=false;syncProjects([v]);updTask(t.id,{p:v},`「${v}」 프로젝트로 넣었습니다`)};
+  const projAdd=S.addProj?h("input",{class:"in",id:"sh-newp",style:"flex:1 1 150px;min-width:0",placeholder:"새 프로젝트 이름 + Enter",value:S.drafts["sh-newp"]||"",
+      oninput:e=>{S.drafts["sh-newp"]=e.target.value},onkeydown:e=>{if(e.isComposing)return;if(e.key==="Enter")addProj();else if(e.key==="Escape"){e.stopPropagation();S.addProj=false;render()}}})
+    :h("button",{class:"chip",onclick:()=>{S.addProj=true;render();const n=$("#sh-newp");n&&n.focus()}},"＋ 새 프로젝트");
   return h("aside",{class:"sheet","aria-label":"할 일 자세히"},
     h("header",null,h("b",null,isDec(t)?"결정할 일":"할 일"),t.u?h("a",{class:"btn ghost sm",href:t.u,target:"_blank",rel:"noopener"},"노션에서 열기",ic("ext")):null,h("button",{class:"icon-btn","aria-label":"닫기",onclick:closeSheet},ic("x"))),
     h("div",{class:"bd"},
@@ -1819,7 +1827,7 @@ function sheetView(){
         h("button",{class:"chip",onclick:()=>setDate(null)},"날짜 없음")),
         h("div",{class:"row"},h("input",{class:"in",type:"date",id:"sh-d",value:dd||"",onchange:e=>setDate(e.target.value,tm)}),h("input",{class:"in",type:"time",id:"sh-t",value:tm,onchange:e=>setDate(dd||today,e.target.value)}))),
       chips("우선순위",["상","중","하"],t.r,v=>updTask(t.id,{r:v})),
-      chips("프로젝트",PROJECTS,t.p,v=>updTask(t.id,{p:v}),PCOL),
+      chips("프로젝트",PROJECTS,t.p,v=>updTask(t.id,{p:v}),PCOL,projAdd),
       chips("업무 유형",TYPES,t.y,v=>updTask(t.id,{y:v}),TCOL),
       h("div",{class:"field"},h("label",null,"포트폴리오"),h("div",null,h("button",{class:"chip","aria-pressed":String(!!t.star),onclick:()=>updTask(t.id,{star:!t.star})},t.star?"⭐ 들어 있음":"☆ 넣기"))),
       h("div",{class:"field"},h("label",null,"성과·산출물"),h("textarea",{class:"in",id:"sh-out",rows:"3",value:t.out||"",placeholder:"예) 지급증 44건, 5,720,000원 지급 완료",onchange:e=>updTask(t.id,{out:e.target.value},"저장했습니다")})),
@@ -2290,19 +2298,24 @@ function ytParse(u){u=u.trim();if(/^[\w-]{11}$/.test(u))return{v:u};
     if(!v){const m=x.pathname.match(/\/(live|shorts|embed)\/([\w-]{11})/);if(m)v=m[2]}if(!v&&!list)return null;return{v,list}}catch{return null}}
 // M.cur = 지금 틀고 있는 것 {n, v?, list?}. 크롬에 유튜브 프리미엄 계정으로 로그인돼 있으면 광고 없이 재생됨
 M.cur=ls.get("desk:mcur",null);M.track="";M.vid=M.cur&&M.cur.v||null;M.tab="mine";M.pls=null;M.items={};M.res=null;
-function ytLoad(){if(M.loading||M.ready)return;M.loading=true;musicUI();window.onYouTubeIframeAPIReady=()=>{
+// 왜 안 나오는지 화면에 남김(PC마다 다른 문제를 바로 알 수 있게)
+const YTERR={2:"영상 주소가 잘못됐습니다",5:"이 브라우저에서 재생할 수 없습니다",100:"재생할 수 없습니다. 비공개 재생목록이면 이 브라우저를 유튜브 프리미엄 계정으로 로그인해 주세요",101:"다른 사이트 재생이 막힌 곡입니다",150:"다른 사이트 재생이 막힌 곡입니다",152:"다른 사이트 재생이 막힌 곡입니다",153:"유튜브가 이 페이지 주소를 받지 못했습니다(개인정보 보호 확장·브라우저 설정 확인)"};
+function musicErr(msg){M.err=msg;toast(msg,"bad");musicUI()}
+function ytFail(){M.loading=false;musicErr("유튜브 플레이어를 불러오지 못했습니다(광고 차단 확장·네트워크 확인)")}
+function ytWatch(){clearTimeout(M.watch);M.err=null;M.watch=setTimeout(()=>{if(!M.play&&M.cur)musicErr("재생이 시작되지 않았습니다. 재생을 한 번 더 누르거나 이 브라우저의 유튜브 로그인을 확인해 주세요")},9000)}
+function ytLoad(){if(M.loading||M.ready)return;M.loading=true;ytWatch();musicUI();window.onYouTubeIframeAPIReady=()=>{
   const st=M.cur||{};
   M.p=new YT.Player("yt",{width:"104",height:"58",videoId:st.v||undefined,playerVars:Object.assign({autoplay:1,playsinline:1,rel:0,controls:0,disablekb:1,origin:location.origin},st.list?{listType:"playlist",list:st.list}:{}),
     events:{onReady:e=>{M.ready=true;e.target.setVolume(M.vol);e.target.playVideo();musicUI()},
-      onStateChange:e=>{M.play=e.data===1;
+      onStateChange:e=>{M.play=e.data===1;if(M.play){M.err=null;clearTimeout(M.watch)}
         // 끊김 없이: 재생목록은 끝나면 처음부터, 한 곡짜리는 다음 저장 곡으로
         if(e.data===1&&M.cur&&M.cur.list&&M.p.setLoop)M.p.setLoop(true);
         if(e.data===0&&M.cur&&!M.cur.list){if(M.list.length>1)musicNext();else M.p.playVideo()}const d=M.p.getVideoData&&M.p.getVideoData();if(d){M.track=d.title||"";M.vid=d.video_id||M.vid}
         if(e.data===1&&M.track)document.title=`♪ ${M.track}`;else if(!TM.run)document.title="햄찌스 데스크";musicUI()},
-      onError:()=>toast("이 곡은 다른 사이트 재생이 막혀 있습니다. 다음 곡으로 넘겨 주세요","bad")}})};
-  document.head.append(h("script",{src:"https://www.youtube.com/iframe_api"}));}
+      onError:e=>{clearTimeout(M.watch);musicErr(`${YTERR[e.data]||"재생 오류"} (코드 ${e.data})`)}}})};
+  const sc=h("script",{src:"https://www.youtube.com/iframe_api"});sc.onerror=ytFail;document.head.append(sc);}
 function playSrc(src){M.cur=src;ls.set("desk:mcur",src);M.vid=src.v||null;M.track=src.n||"";
-  if(!M.ready){ytLoad();musicUI();return}
+  if(!M.ready){ytLoad();musicUI();return}ytWatch();
   if(src.list)M.p.loadPlaylist({listType:"playlist",list:src.list,index:0});else M.p.loadVideoById(src.v);musicUI()}
 function playStation(i){M.i=i;ls.set("desk:station",i);playSrc(M.list[i])}
 function musicToggle(){if(!M.cur){M.tab="mine";openSheet("music",null);return}if(!M.ready){ytLoad();return}M.play?M.p.pauseVideo():M.p.playVideo()}
@@ -2320,7 +2333,7 @@ function musicUI(){
   $("#vlabel").style.backgroundImage=M.vid?`url(https://i.ytimg.com/vi/${M.vid}/mqdefault.jpg)`:"";
   $("#ytbox").style.visibility=M.ready?"visible":"hidden";
   fill($("#mctl"),
-    h("div",{class:"now"},h("b",{title:M.track||(M.cur&&M.cur.n)||""},M.track||(M.cur&&M.cur.n)||"음악을 골라 주세요"),h("span",null,M.cur&&M.cur.list?"재생목록 · "+(M.cur.n||""):M.ready?"유튜브":"재생을 누르면 시작합니다")),
+    h("div",{class:"now"},h("b",{title:M.track||(M.cur&&M.cur.n)||""},M.track||(M.cur&&M.cur.n)||"음악을 골라 주세요"),h("span",M.err?{style:"color:var(--red);white-space:normal",title:M.err}:null,M.err||(M.cur&&M.cur.list?"재생목록 · "+(M.cur.n||""):M.ready?"유튜브":"재생을 누르면 시작합니다"))),
     h("div",{class:"ctl"},h("button",{class:"icon-btn","aria-label":"이전 곡",onclick:musicPrev},h("span",{style:"display:inline-block;transform:scaleX(-1)"},ic("next"))),
       h("button",{class:"icon-btn play","aria-label":M.play?"일시정지":"재생",onclick:musicToggle},ic(M.play?"pause":"play")),
       h("button",{class:"icon-btn","aria-label":"다음 곡",onclick:musicNext},ic("next")),
@@ -2763,7 +2776,7 @@ function render(){
   const ae=document.activeElement,aeId=ae&&ae.id,selS=ae&&ae.selectionStart,selE=ae&&ae.selectionEnd;
   const layer=$("#layer");
   if(!S.data){$("#app").hidden=true;fill(layer,setupView());restore();return}
-  $("#app").hidden=false;
+  $("#app").hidden=false;syncProjects();
   const cnt=navCounts();
   fill($("#nav"),h("h6",null,"햄찌스 데스크"),VIEWS.map(([k,n,icn],i)=>h("button",{"aria-current":S.view===k?"page":null,onclick:()=>{S.view=k;ls.set("desk:view",k);S.sel=null;render();$("#scroll").scrollTop=0},title:`${n} (${i+1})`},ic(icn),n,cnt[k]?h("span",{class:"c"},cnt[k]):null)),
     h("h6",null,"프로젝트"),PVIEWS.map(([k,n,,col])=>h("button",{"aria-current":S.view===k?"page":null,onclick:()=>{S.view=k;ls.set("desk:view",k);S.sel=null;render();$("#scroll").scrollTop=0}},h("span",{class:"dot",style:`background:${col}`}),h("span",{style:"overflow:hidden;text-overflow:ellipsis;white-space:nowrap"},n),cnt[k]?h("span",{class:"c"},cnt[k]):null)),
