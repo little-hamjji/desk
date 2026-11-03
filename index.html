@@ -1863,15 +1863,22 @@ function expSource(src,x,f){
 }
 function expCheck(row){const used=Object.values(S.exps).some(e=>e.multi&&(e.rows||[]).some(r=>r.src===row.src));
   return h("span",{style:"display:inline-flex;align-items:center;gap:4px",onclick:ev=>{ev.stopPropagation();if(ev.currentTarget.closest('label'))ev.preventDefault()},onkeydown:ev=>ev.stopPropagation()},
-    h("input",{type:"checkbox","aria-label":"지결 선택",checked:!!S.expPick[row.src],onclick:ev=>ev.stopPropagation(),onchange:ev=>{ev.stopPropagation();if(ev.target.checked)S.expPick[row.src]={...row};else delete S.expPick[row.src];render()}}),used?h("span",{class:"pill"},"지결 묶음"):null);
+    h("input",{type:"checkbox","data-exp-src":row.src,"aria-label":"지결 선택",checked:!!S.expPick[row.src],onclick:ev=>ev.stopPropagation(),onchange:ev=>{ev.stopPropagation();if(ev.target.checked)S.expPick[row.src]={...row};else delete S.expPick[row.src];expRefreshSelection()}}),used?h("span",{class:"pill"},"지결 묶음"):null);
+}
+// Keep list DOM, nested scroll positions, expanded rows and active tabs intact.
+function expRefreshSelection(){
+  document.querySelectorAll('input[data-exp-src]').forEach(el=>{el.checked=!!S.expPick[el.getAttribute("data-exp-src")]});
+  const old=document.getElementById("exp-selection-bar"),bar=expBar();
+  if(old){if(bar)old.replaceWith(bar);else old.remove()}
+  else if(bar){const layer=document.getElementById("layer");if(layer)layer.prepend(bar)}
 }
 function expBundle(){const rows=Object.values(S.expPick).map(r=>({...r}));if(!rows.length)return;
   const key="multi:"+Date.now();S.exps[key]=Object.assign(expDefault(key,"","","","여러 건 지결"),{multi:true,rows});
   ls.set("desk:exps",S.exps);S.expPick={};S.sel={kind:"exp",key};render();
 }
 function expBar(){const rows=Object.values(S.expPick);if(!rows.length)return null;
-  return h("div",{role:"region","aria-label":"지결 선택 목록",style:"position:fixed;bottom:calc(66px + env(safe-area-inset-bottom));left:12px;right:12px;z-index:90;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;background:var(--win,#1c1c1e);color:var(--fg,#fff);border:1px solid var(--line,#aaa);border-radius:12px;box-shadow:0 4px 20px #0003"},
-    h("b",{style:"flex:1 1 160px"},rows.length+"건 선택 · 합계 "+expSum({rows}).toLocaleString()+"원"),h("button",{class:"btn go",onclick:expBundle},"지결로 묶기"),h("button",{class:"btn",onclick:()=>{S.expPick={};render()}},"선택 해제"));
+  return h("div",{id:"exp-selection-bar",role:"region","aria-label":"지결 선택 목록",style:"position:fixed;bottom:calc(66px + env(safe-area-inset-bottom));left:12px;right:12px;z-index:90;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;background:var(--win,#1c1c1e);color:var(--fg,#fff);border:1px solid var(--line,#aaa);border-radius:12px;box-shadow:0 4px 20px #0003"},
+    h("b",{style:"flex:1 1 160px"},rows.length+"건 선택 · 합계 "+expSum({rows}).toLocaleString()+"원"),h("button",{class:"btn go",onclick:expBundle},"지결로 묶기"),h("button",{class:"btn",onclick:()=>{S.expPick={};expRefreshSelection()}},"선택 해제"));
 }
 function expRows(e,save){const fields=[["date","날짜"],["vendor","거래처"],["bizno","사업자번호"],["amt","금액"],["memo","적요"]];
   return h("div",null,h("div",{style:"overflow-x:auto"},h("table",{style:"min-width:650px;width:100%"},h("thead",null,h("tr",null,fields.map(([,label])=>h("th",null,label)),h("th",null,"삭제"))),h("tbody",null,e.rows.map((r,i)=>h("tr",null,fields.map(([k,label])=>h("td",null,h("input",{class:"in","aria-label":(i+1)+"행 "+label,value:r[k]??"",type:k==="date"?"date":"text",oninput:ev=>{r[k]=ev.target.value;save();const total=document.getElementById("ex-total");if(total)total.textContent="합계 "+expSum(e).toLocaleString()+"원"}}))),h("td",null,h("button",{class:"btn sm",onclick:()=>{e.rows.splice(i,1);save();render()}},"줄 삭제"))))))),h("b",{id:"ex-total"},"합계 "+expSum(e).toLocaleString()+"원"),
