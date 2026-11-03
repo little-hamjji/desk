@@ -2038,7 +2038,7 @@ function hkStatus(){(async()=>{
     if(a){a.click();let boxes=[];for(let k=0;k<24&&!boxes.length;k++){await sleep(250);boxes=[...document.querySelectorAll("table")].filter(t=>t.offsetParent&&/^결\s*재/.test(t.innerText.trim())&&t.innerText.length<300)}
       boxes.forEach(t=>{const trs=[...t.querySelectorAll("tr")];if(trs.length<3)return;const roles=[...trs[0].children].slice(1).map(x=>x.innerText.trim().replace(/\s+/g,""));const ds=[...trs[trs.length-1].children].map(x=>x.innerText.trim());
         roles.forEach((r,j)=>{const m=(ds[j]||"").match(/\d{4}\/\d{2}\/\d{2}/),d=m?m[0]:"",p=steps[steps.length-1];if(p&&p.r===r){if(!p.d)p.d=d}else steps.push({r,d})})});
-      // 문서 내용(기안번호부터 본문 끝까지)과 첨부 파일 이름도 함께 담기
+      /* 문서 내용(기안번호부터 본문 끝까지)과 첨부 파일 이름도 함께 담기 */
       if(boxes[0]){let el=boxes[0];while(el.parentElement&&!/기안번호/.test(el.innerText))el=el.parentElement;let tx=(el.innerText||"").replace(/\n{3,}/g,"\n\n");
         const i=tx.indexOf("기안번호"),j=tx.search(/\n(검토완료|첨언|반려문서보기)\n/);tx=tx.slice(Math.max(0,i),j>i?j:i+4000).slice(0,4000);
         detail=tx;files=[...new Set((tx.match(/[^\n]+\.(pdf|xlsx?|hwpx?|docx?|zip|jpe?g|png)/gi)||[]).map(s=>s.trim()))].slice(0,12);amt=((tx.match(/총합계\s*([\d,]+)/)||[])[1]||"")}
