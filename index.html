@@ -1851,6 +1851,32 @@ function sheetView(){
 // 지출결의 준비: 스캔본마다 이카운트에 넣을 값을 적어 두고, 「이카운트용 복사」 → 이카운트 복사 창에서 즐겨찾기 「햄꾼 채우기」
 S.exps=ls.get("desk:exps",{});
 S.expFiles={};
+S.expPick={};
+const expNum=v=>Number(String(v??"").replace(/[^0-9.-]/g,""))||0;
+const expSum=e=>(e.rows||[]).reduce((n,r)=>n+expNum(r.amt),0);
+function expSource(src,x,f){
+  const base={src:src+":"+(src==="bank"?x.k:src==="cash"?x.key:x.id+":"+(f?f.i:0)),date:"",vendor:"",bizno:"",amt:"",memo:"",file:""};
+  if(src==="bank")Object.assign(base,{date:x.d||"",amt:x.out||"",memo:x.memo||"",vendor:x.ls&&x.ls.length===1?x.ls[0].vendor||"":""});
+  if(src==="cash")Object.assign(base,{date:x.from===x.to?x.from:"",vendor:x.vendors.length===1?x.vendors[0]:"",amt:x.sum,memo:x.memo||""});
+  if(src==="scan")Object.assign(base,{date:dOf(x.at),file:f?"스캔본\\"+dOf(x.at).slice(0,7)+"\\"+dOf(x.at)+"_"+f.name:""});
+  return base;
+}
+function expCheck(row){const used=Object.values(S.exps).some(e=>e.multi&&(e.rows||[]).some(r=>r.src===row.src));
+  return h("span",{style:"display:inline-flex;align-items:center;gap:4px",onclick:ev=>{ev.stopPropagation();if(ev.currentTarget.closest('label'))ev.preventDefault()},onkeydown:ev=>ev.stopPropagation()},
+    h("input",{type:"checkbox","aria-label":"지결 선택",checked:!!S.expPick[row.src],onclick:ev=>ev.stopPropagation(),onchange:ev=>{ev.stopPropagation();if(ev.target.checked)S.expPick[row.src]={...row};else delete S.expPick[row.src];render()}}),used?h("span",{class:"pill"},"지결 묶음"):null);
+}
+function expBundle(){const rows=Object.values(S.expPick).map(r=>({...r}));if(!rows.length)return;
+  const key="multi:"+Date.now();S.exps[key]=Object.assign(expDefault(key,"","","","여러 건 지결"),{multi:true,rows});
+  ls.set("desk:exps",S.exps);S.expPick={};S.sel={kind:"exp",key};render();
+}
+function expBar(){const rows=Object.values(S.expPick);if(!rows.length)return null;
+  return h("div",{role:"region","aria-label":"지결 선택 목록",style:"position:fixed;bottom:calc(66px + env(safe-area-inset-bottom));left:12px;right:12px;z-index:90;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;background:var(--win,#1c1c1e);color:var(--fg,#fff);border:1px solid var(--line,#aaa);border-radius:12px;box-shadow:0 4px 20px #0003"},
+    h("b",{style:"flex:1 1 160px"},rows.length+"건 선택 · 합계 "+expSum({rows}).toLocaleString()+"원"),h("button",{class:"btn go",onclick:expBundle},"지결로 묶기"),h("button",{class:"btn",onclick:()=>{S.expPick={};render()}},"선택 해제"));
+}
+function expRows(e,save){const fields=[["date","날짜"],["vendor","거래처"],["bizno","사업자번호"],["amt","금액"],["memo","적요"]];
+  return h("div",null,h("div",{style:"overflow-x:auto"},h("table",{style:"min-width:650px;width:100%"},h("thead",null,h("tr",null,fields.map(([,label])=>h("th",null,label)),h("th",null,"삭제"))),h("tbody",null,e.rows.map((r,i)=>h("tr",null,fields.map(([k,label])=>h("td",null,h("input",{class:"in","aria-label":(i+1)+"행 "+label,value:r[k]??"",type:k==="date"?"date":"text",oninput:ev=>{r[k]=ev.target.value;save();const total=document.getElementById("ex-total");if(total)total.textContent="합계 "+expSum(e).toLocaleString()+"원"}}))),h("td",null,h("button",{class:"btn sm",onclick:()=>{e.rows.splice(i,1);save();render()}},"줄 삭제"))))))),h("b",{id:"ex-total"},"합계 "+expSum(e).toLocaleString()+"원"),
+    h("div",{class:"note"},"첨부 목록",e.rows.filter(r=>r.file).map(r=>h("div",null,r.file))));
+}
 function expDefault(key,d,file,fname,subj){return {key,d,file,fname,subj,
     title:"[모두의공모] 1차년도 ○○ 지출 결과의 건",ref:"",purpose:"",when:"",paid:d,target:"",vendor:"",bizno:"",amt:"",memo:"",
     docs:"관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서 등 각 1부",pay:"",budget:"(목) 사업비 (세목) (세세목)",note:""}}
@@ -1871,26 +1897,26 @@ function expSheet(){
   const e=S.exps[S.sel.key];if(!e){S.sel=null;return null}
   const save=()=>{e.at=Date.now();ls.set("desk:exps",S.exps)};
   const fld=(label,k,attrs)=>h("label",{class:"field"},h("label",null,label),h(attrs&&attrs.rows?"textarea":"input",Object.assign({class:"in",id:"ex-"+k,value:e[k]||"",oninput:ev=>{e[k]=ev.target.value;save();const pv=$("#ex-pv");if(pv)pv.textContent=expBody(e)}},attrs||{})));
-  const amt=+(String(e.amt).replace(/[^0-9]/g,""))||0;
+  const amt=e.multi?expSum(e):+(String(e.amt).replace(/[^0-9]/g,""))||0;
   return h("aside",{class:"sheet","aria-label":"지출결의 준비"},
     h("header",null,h("b",null,"지출결의 준비 · 이카운트"),h("button",{class:"icon-btn","aria-label":"닫기",onclick:closeSheet},ic("x"))),
     h("div",{class:"bd"},
-      h("div",{class:"note"},"📎 ",e.fname||"(첨부 없음)",e.up?(S.expFiles[e.key]?h("a",{class:"btn sm",href:S.expFiles[e.key],target:"_blank",rel:"noopener"},"파일 보기"):h("button",{class:"btn sm",onclick:()=>expPick(e.key)},"파일 다시 선택")):e.file?h("div",{class:"faint",style:"font-size:11.5px;margin-top:2px"},"G:\\내 드라이브\\CLUDE\\클로드 작업물(회사컴)\\"+e.file):null),
+      e.multi?null:h("div",{class:"note"},"📎 ",e.fname||"(첨부 없음)",e.up?(S.expFiles[e.key]?h("a",{class:"btn sm",href:S.expFiles[e.key],target:"_blank",rel:"noopener"},"파일 보기"):h("button",{class:"btn sm",onclick:()=>expPick(e.key)},"파일 다시 선택")):e.file?h("div",{class:"faint",style:"font-size:11.5px;margin-top:2px"},"G:\\내 드라이브\\CLUDE\\클로드 작업물(회사컴)\\"+e.file):null),
       fld("기안 제목","title"),
       fld("관련 기안(문서)번호·제목","ref",{placeholder:"예) 2026/10/08 -46 2025년 모두의공모 성과공유 워크숍 개최 계획(안)"}),
       fld("사용목적(상세내용)","purpose",{rows:"2",placeholder:"예) 「모두의 공모」 1차년도 성과공유회 워크숍 와이파이 설치"}),
       h("div",{class:"grid g2",style:"gap:10px"},fld("진행일자(장소 및 일시)","when",{placeholder:"예) 2026. 10. 16(금) ~ 17(토)"}),fld("집행일자","paid",{type:"date"})),
-      h("div",{class:"grid g2",style:"gap:10px"},fld("거래처명(대상자)","vendor",{placeholder:"예) 주식회사 에이피시스템"}),fld("사업자번호(거래처 코드)","bizno",{placeholder:"예) 816-88-03448"})),
-      h("div",{class:"grid g2",style:"gap:10px"},fld("금액(원)","amt",{inputmode:"numeric",placeholder:"예) 1700000"}),fld("적요(결의서 표)","memo",{placeholder:"예) 모두의공모 1차년도 성과공유회 워크숍 와이파이 설치"})),
-      amt?h("div",{class:"faint",style:"font-size:12px;margin-top:-6px"},amt.toLocaleString()+"원"):null,
+      e.multi?expRows(e,save):h("div",{class:"grid g2",style:"gap:10px"},fld("거래처명(대상자)","vendor",{placeholder:"예) 주식회사 에이피시스템"}),fld("사업자번호(거래처 코드)","bizno",{placeholder:"예) 816-88-03448"})),
+      e.multi?null:h("div",{class:"grid g2",style:"gap:10px"},fld("금액(원)","amt",{inputmode:"numeric",placeholder:"예) 1700000"}),fld("적요(결의서 표)","memo",{placeholder:"예) 모두의공모 1차년도 성과공유회 워크숍 와이파이 설치"})),
+      !e.multi&&amt?h("div",{class:"faint",style:"font-size:12px;margin-top:-6px"},amt.toLocaleString()+"원"):null,
       fld("결제방법(은행 / 계좌번호 / 예금주)","pay",{placeholder:"예) IBK기업은행 / 541-064469-04-011 / (주)에이피시스템"}),
       fld("첨부서류","docs"),
       fld("모금회 예산과목","budget"),
       h("div",{class:"field"},h("label",null,"본문 미리보기 (이카운트 지출결의서 내용칸에 들어감)"),h("div",{class:"note",id:"ex-pv",style:"font-size:12px"},expBody(e))),
       fld("메모(나만 보기)","note",{rows:"2"}),
       h("div",{class:"faint",style:"font-size:12px;line-height:1.7"},"① 「이카운트용 복사」 → ② 이카운트 내결재관리에서 비슷한 지난 문서 「복사」 → ③ 즐겨찾기 「햄꾼 채우기」 → ④ 노란 칸·첨부 확인 후 임시저장")),
-    h("footer",null,h("button",{class:"btn go",onclick:()=>{if(!amt||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
-        e.ready=true;save();pfCopy(JSON.stringify({hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요");render()}},"이카운트용 복사"),
+    h("footer",null,h("button",{class:"btn go",onclick:()=>{if(!(e.multi?expSum(e):amt)||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
+        e.ready=true;save();pfCopy(JSON.stringify(e.multi?{hamkkun:"exp",v:3,title:e.title,body:expBody(e),amt:expSum(e),rows:e.rows.map(r=>({...r})),files:e.rows.filter(r=>r.file).map(r=>r.file)}:{hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요");render()}},"이카운트용 복사"),
       h("button",{class:"btn",onclick:()=>addTask({t:"지출결의서 작성 — "+(e.vendor||e.fname||e.subj),d:TODAY(),y:"예산·회계",note:(e.up?"파일: ":"스캔: ")+e.file})},"할 일로"),
       h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}if(e.up&&S.expFiles[e.key]){URL.revokeObjectURL(S.expFiles[e.key]);delete S.expFiles[e.key]}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
 }
@@ -1910,6 +1936,25 @@ function hkFill(){(async()=>{
   const setv=(el,v)=>{el.focus();el.value=v;["input","keyup","change","blur"].forEach(x=>el.dispatchEvent(new Event(x,{bubbles:true})));el.style.background="#fff7c2"};
   setv(title,d.title);
   const body=document.querySelector("[data-cid=s_remarks]");if(body&&d.body)setv(body,d.body);
+  if(Array.isArray(d.rows)){
+    let filled=0;const missing=[];
+    for(let i=0;i<d.rows.length;i++){
+      const first=document.querySelector('td[data-columnid=exp_amt][data-key="'+i+'"]');
+      if(!first||first.getClientRects().length===0)break;
+      const tr=first.closest("tr"),r=d.rows[i];let ok=true;
+      for(const [col,val] of [["exp_cust",r.bizno],["exp_cust_des",r.vendor],["exp_amt",r.amt],["exp_remarks",r.memo]]){
+        const td=tr.querySelector("[data-columnid="+col+"]");if(!td){ok=false;break}
+        const o={bubbles:true,cancelable:true,view:window};["mousedown","mouseup","click"].forEach(x=>td.dispatchEvent(new MouseEvent(x,o)));await sleep(350);
+        const inp=td.querySelector("input");if(!inp){ok=false;break}
+        inp.focus();inp.value=val??"";["input","keyup","change"].forEach(x=>inp.dispatchEvent(new Event(x,{bubbles:true})));
+        inp.dispatchEvent(new KeyboardEvent("keydown",{key:"Tab",keyCode:9,which:9,bubbles:true}));await sleep(500);td.style.background="#fff7c2";
+      }
+      if(!ok)break;filled++;if(!r.bizno)missing.push(i+1);
+    }
+    const num=v=>Number(String(v??"").replace(/[^0-9.-]/g,""))||0;
+    const rest=d.rows.slice(filled),more=[...document.querySelectorAll("td[data-columnid=exp_amt]")].filter(x=>Number(x.getAttribute("data-key"))>=filled&&x.innerText.trim()).length;
+    say((rest.length?filled+"줄까지 채웠습니다. 남은 "+rest.length+"줄은 직접 줄을 추가해 주세요\n남은 금액: "+rest.reduce((n,r)=>n+num(r.amt),0).toLocaleString()+"원":"채웠습니다 ✓ 노란 칸을 확인해 주세요.")+(missing.length?"\n거래처 코드가 빈 줄: "+missing.join(", ")+" · 직접 확인해 주세요.":"")+(more?"\n⚠ 아래 줄에 이전 문서 금액이 "+more+"줄 더 있습니다. 지워 주세요.":"")+"\n첨부할 파일:\n"+(d.rows.filter(r=>r.file).map(r=>r.file).join("\n")||"(없음)")+"\n확인 후 「임시저장」은 대표님이 눌러 주세요.",rest.length>0);return;
+  }
   const first=document.querySelector('td[data-columnid=exp_amt][data-key="0"]');
   if(!first){say("제목·본문은 채웠지만 지출결의서 표를 찾지 못했습니다. 지출결의서 창이 열려 있는지 확인해 주세요.",1);return}
   const tr=first.closest("tr");
@@ -1963,7 +2008,7 @@ function apprState(r){
   return days>=3?{t:`${wait.r} 대기 ${days}일째`,c:"orange"}:{t:`${wait.r} 대기`,c:"blue"};
 }
 function apprCard(){
-  const A=S.appr,ups=Object.values(S.exps).filter(e=>e.up);
+  const A=S.appr,ups=Object.values(S.exps).filter(e=>e.up||e.multi);
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
     try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
@@ -1977,7 +2022,7 @@ function apprCard(){
       h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기"),
       h("button",{class:"btn",onclick:()=>expPick()},"파일로 지결 준비")),
     ups.length?h("div",{class:"appr"},ups.map(e=>h("button",{class:"appr-r",onclick:()=>{S.sel={kind:"exp",key:e.key};render()}},
-      h("div",{class:"appr-h"},h("span",{class:"tt"},e.vendor||e.fname),h("span",{class:"pill"},(+(String(e.amt).replace(/[^0-9]/g,""))||0).toLocaleString()+"원"),h("span",{class:"pill "+(e.ready?"green":"")},e.ready?"준비됨":"준비 중"))))):null,
+      h("div",{class:"appr-h"},h("span",{class:"tt"},e.multi?"지결 묶음 · "+e.rows.length+"건":e.vendor||e.fname),h("span",{class:"pill"},(e.multi?expSum(e):(+(String(e.amt).replace(/[^0-9]/g,""))||0)).toLocaleString()+"원"),h("span",{class:"pill "+(e.ready?"green":"")},e.ready?"준비됨":"준비 중"))))):null,
     A&&!(A.v>=2)?h("div",{class:"banner"},"이 결재현황은 예전 버튼으로 가져와서 결재 단계가 없습니다. 즐겨찾기의 「🐹 햄꾼 결재현황」을 지우고 위 파란 버튼을 다시 끌어다 놓은 뒤, 이카운트 「내결재관리 → 진행중」에서 다시 눌러 주세요."):null,
     rows.length?h("div",{class:"appr"},(S.apprAll?rows:rows.slice(0,20)).map(r=>{const s=apprState(r);
       return h("button",{class:"appr-r",onclick:()=>{S.apprPop=r.no;render()}},
@@ -2052,8 +2097,8 @@ function cashCard(){
       C?h("button",{class:"btn go",disabled:!sel.length,onclick:cashAdd},`고른 ${sel.length}건 할 일에 추가`):null),
     C?h("div",{class:"faint",style:"font-size:12px"},`전체 ${C.total.toLocaleString()}줄 중 결의서번호 빈칸 ${C.blank}줄 · ${C.groups.length}묶음 (최근 75일·금액 있는 것만 미리 골라 둠)`):null,
     C&&C.groups.length?h("div",{class:"cash"},C.groups.slice(0,60).map(x=>{const has=cashHas(x),cand=cashCand(x);
-      return h("label",{class:"cash-r"+(has?" done":"")},h("input",{type:"checkbox",checked:!!S.cashPick[x.key]&&!has,disabled:has,onchange:e=>{S.cashPick[x.key]=e.target.checked;render()}}),
-        h("div",{class:"body"},h("span",{class:"tt"},x.memo),h("div",{class:"meta"},h("span",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),h("span",null,x.n+"줄"),h("span",null,x.vendors.slice(0,2).join(", ")),
+      return h("div",{class:"cash-r"+(has?" done":"")},h("input",{type:"checkbox",checked:!!S.cashPick[x.key]&&!has,disabled:has,onchange:e=>{S.cashPick[x.key]=e.target.checked;render()}}),
+        h("div",{class:"body"},expCheck(expSource("cash",x)),h("span",{class:"tt"},x.memo),h("div",{class:"meta"},h("span",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),h("span",null,x.n+"줄"),h("span",null,x.vendors.slice(0,2).join(", ")),
           has?h("span",{class:"pill green"},"할 일 있음"):null,cand?h("span",{class:"pill blue",title:"이카운트 결재현황에 같은 금액 기안이 있습니다. 출납부에 번호만 적으면 될 수 있어요"},"번호 후보 "+cand):h("span",{class:"pill"},"지결 작성 필요"))),
         h("b",{class:"num"+(x.sum<=0?" faint":"")},x.sum.toLocaleString()))})):null);
 }
@@ -2194,7 +2239,7 @@ function bankRow(r,B){
       h("div",{class:"bk-cs"},r.ls.length?chip(r.joined?"o":"g",r.joined?`출납부 ${r.ls[0].row}행 합계로 연결`:`출납부 ${r.ls.length}행`):chip("r","출납부 없음"),
         r.out?(no?chip("g","번호 "+no):chip("o","번호 빈칸")):null,
         r.out?(r.ap?chip(r.by==="번호"?"g":"o",`지결 ${r.ap.no}${r.by==="금액"?" (금액으로 찾음)":""}`):chip("o","결재현황에 없음")):null)),
-    h("div",{class:"bk-a"},h("button",{class:"btn sm"+(st==="ok"?" go":""),"aria-pressed":String(st==="ok"),onclick:()=>bankSet(r.k,"ok")},st==="ok"?"확인함":"확인"),
+    h("div",{class:"bk-a",style:"flex-wrap:wrap"},r.out>0?expCheck(expSource("bank",r)):null,h("button",{class:"btn sm"+(st==="ok"?" go":""),"aria-pressed":String(st==="ok"),onclick:()=>bankSet(r.k,"ok")},st==="ok"?"확인함":"확인"),
       h("button",{class:"btn sm ghost","aria-pressed":String(st==="hold"),onclick:()=>bankSet(r.k,"hold")},st==="hold"?"보류 중":"보류")),
     open?h("div",{class:"bk-d"},
       r.flags.length?h("div",{class:"bk-f"},r.flags.join(" · ")):null,
@@ -2661,7 +2706,8 @@ function scanCard(){
       h("div",{style:"min-width:0"},h("div",{style:"font-size:12.5px"},h("b",null,fmtMD(dOf(x.at))+" "+tOf(x.at))," · ",x.subj||"스캔"),
         h("div",{class:"files"},x.files.map(f=>h("button",{class:"f",title:f.name+" · "+Math.round(f.size/1024)+"KB"+(S.scanSaved.has("scan:"+x.id+":"+f.i)?" · PC 폴더(스캔본)에 보관됨":""),onclick:()=>scanGet(x,f,false)},"⬇",h("span",null,f.name),S.scanSaved.has("scan:"+x.id+":"+f.i)?h("em",{class:"saved"},"PC ✓"):null))),
       ),
-      h("div",{class:"row",style:"gap:2px"},
+      h("div",{class:"row",style:"gap:2px;flex-wrap:wrap"},
+        x.files.length?x.files.map((f,i)=>h("label",{title:f.name},expCheck(expSource("scan",x,f)),x.files.length>1?"첨부 "+(i+1):null)):expCheck(expSource("scan",x)),
         h("button",{class:"icon-btn",title:"미리 보기","aria-label":"미리 보기",onclick:()=>scanGet(x,x.files[0],true)},ic("search")),
         h("button",{class:"btn sm"+(S.exps[x.id+":"+(x.files[0]?x.files[0].i:0)]&&S.exps[x.id+":"+(x.files[0]?x.files[0].i:0)].ready?" go":""),title:"지출결의 준비(이카운트)",onclick:()=>expOpen(x,x.files[0])},S.exps[x.id+":"+(x.files[0]?x.files[0].i:0)]&&S.exps[x.id+":"+(x.files[0]?x.files[0].i:0)].ready?"준비됨":"지결 준비"),
         h("button",{class:"icon-btn",title:"지출결의 할 일 만들기","aria-label":"지출결의 할 일 만들기",onclick:()=>addTask({t:"지출결의서 작성 — "+(x.files[0]&&x.files[0].name||x.subj),d:TODAY(),y:"예산·회계",note:"스캔 "+fmtMD(dOf(x.at))+" · "+gmailUrl(box.account,x.th)})},ic("arrow")),
@@ -2828,7 +2874,7 @@ function render(){
   let content;try{content=(views[S.view]||viewToday)()}catch(e){console.error(e);content=h("div",{class:"banner"},"이 화면을 그리는 중 문제가 생겼습니다: "+e.message)}
   fill($("#page"),...[connBanner(),S.demo?h("div",{class:"banner"},"지금은 예시 데이터입니다. 실제 노션과 연결하려면 ",h("button",{class:"btn sm",onclick:lock},"연결하기"),"를 누르세요."):null,...[].concat(content)].filter(Boolean));
   if(S.view!=="pf"&&PF.story!=null)storyClose();
-  fill(layer,...[apprModal(),withGrip(sheetView()),dayModal(),paletteView(),quickModal(),diagView()].filter(Boolean));
+  fill(layer,...[expBar(),apprModal(),withGrip(sheetView()),dayModal(),paletteView(),quickModal(),diagView()].filter(Boolean));
   fill($("#rail"),railView());renderSync();musicUI();restore();
   function restore(){if(!aeId)return;const el=document.getElementById(aeId);if(el&&el!==document.activeElement){el.focus();try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
