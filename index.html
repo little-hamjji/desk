@@ -1850,11 +1850,19 @@ function sheetView(){
 }
 // 지출결의 준비: 스캔본마다 이카운트에 넣을 값을 적어 두고, 「이카운트용 복사」 → 이카운트 복사 창에서 즐겨찾기 「햄꾼 채우기」
 S.exps=ls.get("desk:exps",{});
-function expOpen(x,f){const key=x.id+":"+(f?f.i:0),d=dOf(x.at);
-  if(!S.exps[key])S.exps[key]={key,d,file:f?`스캔본\\${d.slice(0,7)}\\${d}_${f.name}`:"",fname:f?f.name:"",subj:x.subj||"",
+S.expFiles={};
+function expDefault(key,d,file,fname,subj){return {key,d,file,fname,subj,
     title:"[모두의공모] 1차년도 ○○ 지출 결과의 건",ref:"",purpose:"",when:"",paid:d,target:"",vendor:"",bizno:"",amt:"",memo:"",
-    docs:"관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서 등 각 1부",pay:"",budget:"(목) 사업비 (세목) (세세목)",note:""};
+    docs:"관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서 등 각 1부",pay:"",budget:"(목) 사업비 (세목) (세세목)",note:""}}
+function expOpen(x,f){const key=x.id+":"+(f?f.i:0),d=dOf(x.at);
+  if(!S.exps[key])S.exps[key]=expDefault(key,d,f?`스캔본\\${d.slice(0,7)}\\${d}_${f.name}`:"",f?f.name:"",x.subj||"");
   S.sel={kind:"exp",key};render()}
+function expPick(key){const input=h("input",{type:"file",accept:"application/pdf,image/*",onchange:ev=>{const f=ev.target.files[0];if(!f)return;
+    const e=key?S.exps[key]:null;if(key&&(!e||!e.up))return;
+    const k=key||"up:"+Date.now(),url=URL.createObjectURL(f);
+    if(S.expFiles[k])URL.revokeObjectURL(S.expFiles[k]);S.expFiles[k]=url;
+    if(e){e.fname=f.name;e.file=f.name}else S.exps[k]=Object.assign(expDefault(k,TODAY(),f.name,f.name,""),{up:true});
+    ls.set("desk:exps",S.exps);S.sel={kind:"exp",key:k};render()}});input.click()}
 const kday=s=>{if(!s)return"";const d=new Date(s+"T00:00:00");return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}.(${"일월화수목금토"[d.getDay()]})`};
 // 지난 지출결의(10/27 와이파이 설치비 등)와 같은 본문 순서
 function expBody(e){return [e.ref?`기안(문서)번호: ${e.ref}`:null,`사용목적(상세내용) : ${e.purpose}`,`장소 및 일시(기간) : ${e.when?e.when+" - 진행일자, ":""}${kday(e.paid)} - 집행일자`,
@@ -1867,7 +1875,7 @@ function expSheet(){
   return h("aside",{class:"sheet","aria-label":"지출결의 준비"},
     h("header",null,h("b",null,"지출결의 준비 · 이카운트"),h("button",{class:"icon-btn","aria-label":"닫기",onclick:closeSheet},ic("x"))),
     h("div",{class:"bd"},
-      h("div",{class:"note"},"📎 ",e.fname||"(첨부 없음)",e.file?h("div",{class:"faint",style:"font-size:11.5px;margin-top:2px"},"G:\\내 드라이브\\CLUDE\\클로드 작업물(회사컴)\\"+e.file):null),
+      h("div",{class:"note"},"📎 ",e.fname||"(첨부 없음)",e.up?(S.expFiles[e.key]?h("a",{class:"btn sm",href:S.expFiles[e.key],target:"_blank",rel:"noopener"},"파일 보기"):h("button",{class:"btn sm",onclick:()=>expPick(e.key)},"파일 다시 선택")):e.file?h("div",{class:"faint",style:"font-size:11.5px;margin-top:2px"},"G:\\내 드라이브\\CLUDE\\클로드 작업물(회사컴)\\"+e.file):null),
       fld("기안 제목","title"),
       fld("관련 기안(문서)번호·제목","ref",{placeholder:"예) 2026/10/08 -46 2025년 모두의공모 성과공유 워크숍 개최 계획(안)"}),
       fld("사용목적(상세내용)","purpose",{rows:"2",placeholder:"예) 「모두의 공모」 1차년도 성과공유회 워크숍 와이파이 설치"}),
@@ -1883,8 +1891,8 @@ function expSheet(){
       h("div",{class:"faint",style:"font-size:12px;line-height:1.7"},"① 「이카운트용 복사」 → ② 이카운트 내결재관리에서 비슷한 지난 문서 「복사」 → ③ 즐겨찾기 「햄꾼 채우기」 → ④ 노란 칸·첨부 확인 후 임시저장")),
     h("footer",null,h("button",{class:"btn go",onclick:()=>{if(!amt||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
         e.ready=true;save();pfCopy(JSON.stringify({hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요");render()}},"이카운트용 복사"),
-      h("button",{class:"btn",onclick:()=>addTask({t:"지출결의서 작성 — "+(e.vendor||e.fname||e.subj),d:TODAY(),y:"예산·회계",note:"스캔: "+e.file})},"할 일로"),
-      h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
+      h("button",{class:"btn",onclick:()=>addTask({t:"지출결의서 작성 — "+(e.vendor||e.fname||e.subj),d:TODAY(),y:"예산·회계",note:(e.up?"파일: ":"스캔: ")+e.file})},"할 일로"),
+      h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}if(e.up&&S.expFiles[e.key]){URL.revokeObjectURL(S.expFiles[e.key]);delete S.expFiles[e.key]}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
 }
 
 /* ── 이카운트 즐겨찾기 버튼(북마클릿): 이카운트 화면에서 실행되는 코드 ── */
@@ -1955,7 +1963,7 @@ function apprState(r){
   return days>=3?{t:`${wait.r} 대기 ${days}일째`,c:"orange"}:{t:`${wait.r} 대기`,c:"blue"};
 }
 function apprCard(){
-  const A=S.appr;
+  const A=S.appr,ups=Object.values(S.exps).filter(e=>e.up);
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
     try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
@@ -1966,7 +1974,10 @@ function apprCard(){
     h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
       h("a",{class:"btn go",href:bmk(hkFill),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 채우기"),
       h("a",{class:"btn pri",href:bmk(hkStatus),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 결재현황"),
-      h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기")),
+      h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기"),
+      h("button",{class:"btn",onclick:()=>expPick()},"파일로 지결 준비")),
+    ups.length?h("div",{class:"appr"},ups.map(e=>h("button",{class:"appr-r",onclick:()=>{S.sel={kind:"exp",key:e.key};render()}},
+      h("div",{class:"appr-h"},h("span",{class:"tt"},e.vendor||e.fname),h("span",{class:"pill"},(+(String(e.amt).replace(/[^0-9]/g,""))||0).toLocaleString()+"원"),h("span",{class:"pill "+(e.ready?"green":"")},e.ready?"준비됨":"준비 중"))))):null,
     A&&!(A.v>=2)?h("div",{class:"banner"},"이 결재현황은 예전 버튼으로 가져와서 결재 단계가 없습니다. 즐겨찾기의 「🐹 햄꾼 결재현황」을 지우고 위 파란 버튼을 다시 끌어다 놓은 뒤, 이카운트 「내결재관리 → 진행중」에서 다시 눌러 주세요."):null,
     rows.length?h("div",{class:"appr"},(S.apprAll?rows:rows.slice(0,20)).map(r=>{const s=apprState(r);
       return h("button",{class:"appr-r",onclick:()=>{S.apprPop=r.no;render()}},
