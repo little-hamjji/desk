@@ -1856,14 +1856,15 @@ const expNum=v=>Number(String(v??"").replace(/[^0-9.-]/g,""))||0;
 const expSum=e=>(e.rows||[]).reduce((n,r)=>n+expNum(r.amt),0);
 function expSource(src,x,f){
   const base={src:src+":"+(src==="bank"?x.k:src==="cash"?x.key:x.id+":"+(f?f.i:0)),date:"",vendor:"",bizno:"",amt:"",memo:"",file:""};
-  if(src==="bank")Object.assign(base,{date:x.d||"",amt:x.out||"",memo:x.memo||"",vendor:x.ls&&x.ls.length===1?x.ls[0].vendor||"":""});
+  if(src==="bank")Object.assign(base,{date:x.d||"",amt:x.out||"",memo:x.memo||"",pay:/카드|이체/.test(x.kind||"")?x.kind:"",vendor:x.ls&&x.ls.length===1?x.ls[0].vendor||"":""});
   if(src==="cash")Object.assign(base,{date:x.from===x.to?x.from:"",vendor:x.vendors.length===1?x.vendors[0]:"",amt:x.sum,sourceAmt:x.sum,from:x.from,to:x.to,memo:x.memo||""});
   if(src==="scan")Object.assign(base,{date:dOf(x.at),file:f?"스캔본\\"+dOf(x.at).slice(0,7)+"\\"+dOf(x.at)+"_"+f.name:""});
   return base;
 }
-function expCheck(row){const used=Object.values(S.exps).some(e=>e.multi&&(e.rows||[]).some(r=>r.src===row.src));
+function expFindBundle(src){return Object.values(S.exps).filter(e=>e.multi&&[...(e.rows||[]),...(e.attachments||[])].some(r=>r.src===src)).sort((a,b)=>{const at=e=>typeof e.at==="number"?e.at:Date.parse(e.at)||Number(String(e.key||"").split(":").pop())||0;return at(b)-at(a)})[0]}
+function expCheck(row){const used=expFindBundle(row.src);
   return h("span",{style:"display:inline-flex;align-items:center;gap:4px",onclick:ev=>{ev.stopPropagation();if(ev.currentTarget.closest('label'))ev.preventDefault()},onkeydown:ev=>ev.stopPropagation()},
-    h("input",{type:"checkbox","data-exp-src":row.src,"aria-label":"지결 선택",checked:!!S.expPick[row.src],onclick:ev=>ev.stopPropagation(),onchange:ev=>{ev.stopPropagation();if(ev.target.checked)S.expPick[row.src]={...row};else delete S.expPick[row.src];expRefreshSelection()}}),used?h("span",{class:"pill"},"지결 묶음"):null);
+    h("input",{type:"checkbox","data-exp-src":row.src,"aria-label":"지결 선택",checked:!!S.expPick[row.src],onclick:ev=>ev.stopPropagation(),onchange:ev=>{ev.stopPropagation();if(ev.target.checked)S.expPick[row.src]={...row};else delete S.expPick[row.src];expRefreshSelection()}}),used?h("button",{type:"button",class:"pill",onclick:ev=>{ev.preventDefault();ev.stopPropagation();const e=expFindBundle(row.src);if(e){S.sel={kind:"exp",key:e.key};render()}}},"지결 묶음"):null);
 }
 // Keep list DOM, nested scroll positions, expanded rows and active tabs intact.
 function expRefreshSelection(){
@@ -1873,7 +1874,7 @@ function expRefreshSelection(){
   else if(bar){const layer=document.getElementById("layer");if(layer)layer.prepend(bar)}
 }
 function expBundle(){const rows=Object.values(S.expPick).map(r=>({...r}));if(!rows.length)return;
-  const key="multi:"+Date.now();S.exps[key]=Object.assign(expDefault(key,"","","","여러 건 지결"),{multi:true,rows});
+  const key="multi:"+Date.now();S.exps[key]=Object.assign(expDefault(key,"","","","여러 건 지결"),{multi:true,rows,at:Date.now()});
   ls.set("desk:exps",S.exps);S.expPick={};S.sel={kind:"exp",key};render();
 }
 function expBar(){const rows=Object.values(S.expPick);if(!rows.length)return null;
@@ -1881,17 +1882,24 @@ function expBar(){const rows=Object.values(S.expPick);if(!rows.length)return nul
     h("b",{style:"flex:1 1 160px"},rows.length+"건 선택 · 합계 "+expSum({rows}).toLocaleString()+"원"),h("button",{class:"btn go",onclick:expBundle},"지결로 묶기"),h("button",{class:"btn",onclick:()=>{S.expPick={};expRefreshSelection()}},"선택 해제"));
 }
 function expRows(e,save){const fields=[["date","날짜"],["vendor","거래처"],["bizno","사업자번호"],["amt","금액"],["memo","적요"]];
-  return h("div",{id:"ex-rows"},h("div",{style:"overflow-x:auto"},h("table",{style:"min-width:650px;width:100%"},h("thead",null,h("tr",null,fields.map(([,label])=>h("th",null,label)),h("th",null,"삭제"))),h("tbody",null,e.rows.map((r,i)=>h("tr",null,fields.map(([k,label])=>h("td",null,h("input",{class:"in","aria-label":(i+1)+"행 "+label,value:r[k]??"",type:k==="date"?"date":"text",oninput:ev=>{r[k]=ev.target.value;save();const total=document.getElementById("ex-total");if(total)total.textContent="합계 "+expSum(e).toLocaleString()+"원"}}))),h("td",null,h("button",{class:"btn sm",onclick:()=>{e.rows.splice(i,1);save();render()}},"줄 삭제"))))))),h("b",{id:"ex-total"},"합계 "+expSum(e).toLocaleString()+"원"),
-    h("div",{class:"note"},"첨부 목록",expAttachments(e).map(f=>h("div",null,f))));
+  return h("div",{id:"ex-rows"},h("div",{style:"overflow-x:auto"},h("table",{style:"min-width:650px;width:100%"},h("thead",null,h("tr",null,fields.map(([,label])=>h("th",null,label)),h("th",null,"삭제"))),h("tbody",null,e.rows.map((r,i)=>h("tr",null,fields.map(([k,label])=>h("td",null,h("input",{class:"in","aria-label":(i+1)+"행 "+label,value:r[k]??"",type:k==="date"?"date":"text",oninput:ev=>{r[k]=ev.target.value;save();const total=document.getElementById("ex-total");if(total)total.textContent="합계 "+expSum(e).toLocaleString()+"원"}}))),h("td",null,h("button",{class:"btn sm",onclick:()=>{e.rows.splice(i,1);save();render()}},"줄 삭제"))))))),h("button",{class:"btn sm",onclick:()=>{e.rows.push({src:"manual:"+Date.now(),date:"",vendor:"",bizno:"",amt:"",memo:"",file:""});save();render()}},"줄 추가"),h("b",{id:"ex-total"},"합계 "+expSum(e).toLocaleString()+"원"),
+    h("div",{class:"note"},"첨부 목록",h("button",{class:"btn sm",onclick:()=>expAttach(e,save)},"첨부 추가"),expAttachments(e).map(f=>h("div",null,f,S.expFiles[expFileKey(e,f)]?h("a",{class:"btn sm",href:S.expFiles[expFileKey(e,f)],target:"_blank",rel:"noopener"},"보기"):null,h("button",{class:"btn sm",onclick:()=>{const k=expFileKey(e,f);if(S.expFiles[k])URL.revokeObjectURL(S.expFiles[k]);delete S.expFiles[k];e.files=(e.files||[]).filter(n=>n!==f);e.attachments=(e.attachments||[]).filter(a=>a.file!==f);e.rows.forEach(r=>{if(r.file===f)r.file=""});save();render()}},"빼기")))));
 }
-function expAttachments(e){return [...new Set([...(e.files||[]),...(e.rows||[]).map(r=>r.file)].filter(Boolean))]}
+function expAttachments(e){return [...new Set([...(e.files||[]),...(e.attachments||[]).map(a=>a.file),...(e.rows||[]).map(r=>r.file)].filter(Boolean))]}
+function expFileKey(e,name){return JSON.stringify([e.key,name])}
+function expAttach(e,save){const input=h("input",{type:"file",multiple:true,onchange:ev=>{
+  for(const f of ev.target.files){const k=expFileKey(e,f.name);if(S.expFiles[k])URL.revokeObjectURL(S.expFiles[k]);S.expFiles[k]=URL.createObjectURL(f);e.files=[...new Set([...(e.files||[]),f.name])]}
+  save();render()
+}});input.click()}
+function expPeriod(dates){if(!dates.length)return "";const a=dates[0],b=dates[dates.length-1];if(a===b)return kday(a);
+ const end=kday(b);return kday(a)+" ~ "+(a.slice(0,7)===b.slice(0,7)?end.split(". ").pop():a.slice(0,4)===b.slice(0,4)?end.slice(end.indexOf(". ")+2):end)}
 function expAutoFill(e,save){
   if(!e.multi)return;
   const empty=v=>v==null||String(v).trim()==="";
   let filled=0,moved=0;
   const put=(k,v)=>{if(empty(e[k])&&!empty(v)){e[k]=v;filled++}};
   const files=expAttachments(e);
-  e.rows=e.rows.filter(r=>{if(String(r.src||"").startsWith("scan:")&&empty(r.amt)){moved++;return false}return true});
+  e.rows=e.rows.filter(r=>{if(String(r.src||"").startsWith("scan:")&&empty(r.amt)){if(r.file){e.attachments=e.attachments||[];if(!e.attachments.some(a=>a.src===r.src&&a.file===r.file))e.attachments.push({src:r.src,file:r.file})}moved++;return false}return true});
   e.files=files;
   const base=e.rows.filter(r=>/^(cash|bank):/.test(r.src||""));
   const unique=values=>[...new Set(values.filter(v=>!empty(v)).map(v=>String(v).trim()))];
@@ -1900,21 +1908,29 @@ function expAutoFill(e,save){
   if(e.title===expDefault().title&&purpose){e.title=e.title.replace("○○",purpose);filled++}
   const vendors=unique(base.map(r=>r.vendor));if(vendors.length===1)put("target",vendors[0]);
   const dates=unique(base.flatMap(r=>[r.date,r.from,r.to])).filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v)).sort();
-  if(dates.length===1)put("paid",dates[0]);else if(dates.length>1)put("when",dates[0]+" ~ "+dates[dates.length-1]);
-  if((empty(e.docs)||e.docs===expDefault().docs)&&files.length){e.docs=files.map(f=>f.split(/[\\/]/).pop()).join(", ");filled++}
+  if(dates.length===1)put("paid",dates[0]);
+  put("when",expPeriod(dates));
+  const conflicts=[];
+  for(const [k,label] of [["budget","모금회 예산과목"],["pay","결제방법"]]){
+    const values=unique(base.map(r=>r[k]));if(e[k]===expDefault()[k])e[k]="";
+    if(base.length&&base.every(r=>!empty(r[k]))&&values.length===1)put(k,values[0]);
+    if(values.length>1)conflicts.push(label+" "+values.length+"종류 확인 필요");
+  }
+  if(empty(e.docs)||e.docs==="관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서 등 각 1부"){e.docs=expDefault().docs;filled++}
   save();
   // Update only the sheet fields/table; leave the page, sheet scroll and button focus intact.
-  for(const k of ["title","purpose","target","paid","when","docs"]){const el=document.getElementById("ex-"+k);if(el)el.value=e[k]||""}
+  for(const k of ["title","purpose","target","paid","when","docs","budget","pay"]){const el=document.getElementById("ex-"+k);if(el)el.value=e[k]||""}
   const old=document.getElementById("ex-rows");if(old){const left=old.firstElementChild&&old.firstElementChild.scrollLeft;const next=expRows(e,save);old.replaceWith(next);if(next.firstElementChild)next.firstElementChild.scrollLeft=left||0}
   const pv=document.getElementById("ex-pv");if(pv)pv.textContent=expBody(e);
   const missing=[["vendor","거래처"],["bizno","사업자번호"],["amt","금액"]].filter(([k])=>e.rows.some(r=>empty(r[k]))).map(([,n])=>n);
+  for(const [k,label] of [["budget","모금회 예산과목"],["pay","결제방법"],["when","장소 및 일시"]])if(empty(e[k]))missing.push(label);
   const cash=e.rows.filter(r=>String(r.src||"").startsWith("cash:"));
   const mismatch=cash.length&&cash.every(r=>r.sourceAmt!=null)&&expSum(e)!==cash.reduce((n,r)=>n+expNum(r.sourceAmt),0);
-  toast("채운 칸 "+filled+"개 · 옮긴 스캔 "+moved+"개 · 남은 빈칸: "+(missing.join(", ")||"없음")+(mismatch?" · ⚠ 금액 합계와 출납부 합계가 다릅니다":""),mismatch?"bad":undefined);
+  toast("채운 칸 "+filled+"개 · 옮긴 스캔 "+moved+"개 · 남은 빈칸: "+(missing.join(", ")||"없음")+(conflicts.length?" · "+conflicts.join(" · "):"")+(mismatch?" · ⚠ 금액 합계와 출납부 합계가 다릅니다":""),mismatch?"bad":undefined);
 }
 function expDefault(key,d,file,fname,subj){return {key,d,file,fname,subj,
     title:"[모두의공모] 1차년도 ○○ 지출 결과의 건",ref:"",purpose:"",when:"",paid:d,target:"",vendor:"",bizno:"",amt:"",memo:"",
-    docs:"관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서 등 각 1부",pay:"",budget:"(목) 사업비 (세목) (세세목)",note:""}}
+    docs:"관련기안, 이체 확인증, 전자세금계산서, 통장사본, 사업자등록증, 견적서, 비교견적서 비교견적결과서, 사진 등 각 1부",pay:"",budget:"(목) 사업비 (세목) (세세목)",note:""}}
 function expOpen(x,f){const key=x.id+":"+(f?f.i:0),d=dOf(x.at);
   if(!S.exps[key])S.exps[key]=expDefault(key,d,f?`스캔본\\${d.slice(0,7)}\\${d}_${f.name}`:"",f?f.name:"",x.subj||"");
   S.sel={kind:"exp",key};render()}
@@ -1926,7 +1942,7 @@ function expPick(key){const input=h("input",{type:"file",accept:"application/pdf
     ls.set("desk:exps",S.exps);S.sel={kind:"exp",key:k};render()}});input.click()}
 const kday=s=>{if(!s)return"";const d=new Date(s+"T00:00:00");return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}.(${"일월화수목금토"[d.getDay()]})`};
 // 지난 지출결의(10/27 와이파이 설치비 등)와 같은 본문 순서
-function expBody(e){return [e.ref?`기안(문서)번호: ${e.ref}`:null,`사용목적(상세내용) : ${e.purpose}`,`장소 및 일시(기간) : ${e.when?e.when+" - 진행일자, ":""}${kday(e.paid)} - 집행일자`,
+function expBody(e){return [e.ref?`기안(문서)번호: ${e.ref}`:null,`사용목적(상세내용) : ${e.purpose}`,`장소 및 일시(기간) : ${/진행일자/.test(e.when||"")?e.when:(e.when?e.when+" - 진행일자, ":"")+kday(e.paid)+" - 집행일자"}`,
   `대상자 : ${e.target||e.vendor}`,`첨부서류 : ${e.docs}`,`결제방법(은행-계좌번호-예금주) : ${e.pay}`,`※ 모금회 예산과목 : ${e.budget}`].filter(Boolean).join("\n\n")}
 function expSheet(){
   const e=S.exps[S.sel.key];if(!e){S.sel=null;return null}
@@ -1952,9 +1968,9 @@ function expSheet(){
       fld("메모(나만 보기)","note",{rows:"2"}),
       h("div",{class:"faint",style:"font-size:12px;line-height:1.7"},"① 「이카운트용 복사」 → ② 이카운트 내결재관리에서 비슷한 지난 문서 「복사」 → ③ 즐겨찾기 「햄꾼 채우기」 → ④ 노란 칸·첨부 확인 후 임시저장")),
     h("footer",null,e.multi?h("button",{class:"btn",onclick:()=>expAutoFill(e,save)},"자동 채우기"):null,h("button",{class:"btn go",onclick:()=>{if(!(e.multi?expSum(e):amt)||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
-        e.ready=true;save();pfCopy(JSON.stringify(e.multi?{hamkkun:"exp",v:3,title:e.title,body:expBody(e),amt:expSum(e),rows:e.rows.map(r=>({...r})),files:expAttachments(e)}:{hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요");render()}},"이카운트용 복사"),
+        e.ready=true;save();pfCopy(JSON.stringify(e.multi?{hamkkun:"exp",v:3,title:e.title,body:expBody(e),amt:expSum(e),rows:e.rows.filter(r=>!String(r.src||"").startsWith("manual:")||String(r.amt??"").trim()!=="").map(r=>({...r})),files:expAttachments(e)}:{hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요"+(e.multi?" · 즐겨찾기 「햄꾼 채우기」를 다시 끌어다 놓았는지 확인":""));render()}},"이카운트용 복사"),
       h("button",{class:"btn",onclick:()=>addTask({t:"지출결의서 작성 — "+(e.vendor||e.fname||e.subj),d:TODAY(),y:"예산·회계",note:(e.up?"파일: ":"스캔: ")+e.file})},"할 일로"),
-      h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}if(e.up&&S.expFiles[e.key]){URL.revokeObjectURL(S.expFiles[e.key]);delete S.expFiles[e.key]}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
+      h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}if(e.up&&S.expFiles[e.key]){URL.revokeObjectURL(S.expFiles[e.key]);delete S.expFiles[e.key]}if(e.multi)for(const f of expAttachments(e)){const k=expFileKey(e,f);if(S.expFiles[k]){URL.revokeObjectURL(S.expFiles[k]);delete S.expFiles[k]}}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
 }
 
 /* ── 이카운트 즐겨찾기 버튼(북마클릿): 이카운트 화면에서 실행되는 코드 ── */
@@ -1962,7 +1978,7 @@ function hkFill(){(async()=>{
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const say=(m,bad)=>{let b=document.getElementById("hk-say");if(!b){b=document.createElement("div");b.id="hk-say";document.body.append(b)}
     b.style.cssText="position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:2147483647;background:"+(bad?"#c9302c":"#1c1c1e")+";color:#fff;padding:12px 18px;border-radius:12px;font:600 14px/1.6 sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:80vw;white-space:pre-line";
-    b.textContent="🐹 햄꾼 · "+m;clearTimeout(window.__hkT);window.__hkT=setTimeout(()=>b.remove(),12000)};
+    b.textContent="햄꾼 채우기 v3\n"+m;clearTimeout(window.__hkT);window.__hkT=setTimeout(()=>b.remove(),12000)};
   const title=document.querySelector("[data-cid=title]");
   if(!title){say("기안서 작성 창이 없습니다.\n내결재관리에서 비슷한 지난 문서의 「복사」를 먼저 눌러 주세요.",1);return}
   let t="";try{t=await navigator.clipboard.readText()}catch(e){}
