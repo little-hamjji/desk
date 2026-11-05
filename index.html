@@ -796,6 +796,7 @@ tr.cur td{background:rgba(10,132,255,.1)}
   .diag .r{grid-template-columns:minmax(0,1fr)}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.cash-table{width:100%;border-collapse:collapse;font-size:12px}.cash-table th,.cash-table td{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.cash-table th{white-space:nowrap}.cash-table .num{text-align:right;white-space:nowrap}.cash-table details{min-width:140px}.cash-table summary{cursor:pointer}.cash-table select{max-width:260px}.cash-table td:nth-child(3){min-width:180px}.cash-table td:nth-child(2){white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1892,6 +1893,7 @@ function expCheck(row){const used=expFindBundle(row.src);
 }
 // Keep list DOM, nested scroll positions, expanded rows and active tabs intact.
 function expRefreshSelection(){
+  cashSelectionButton();
   document.querySelectorAll('input[data-exp-src]').forEach(el=>{el.checked=!!S.expPick[el.getAttribute("data-exp-src")]});
   const old=document.getElementById("exp-selection-bar"),bar=expBar();
   if(old){if(bar)old.replaceWith(bar);else old.remove()}
@@ -2181,12 +2183,12 @@ function apprModal(){
 /* ── 현금출납부 → 아직 안 쓴 지출결의를 할 일로 ──
    출납부(F:\함께일하는재단\모두의 공모\★ 재단 현금출납부\*.xlsx)를 브라우저에서 바로 읽음(파일은 올리지 않고 빈칸 묶음만 노션에 보관).
    결의서번호(G열) 빈칸 = ① 지결 아직 안 씀 ② 썼는데 번호 미기입 → 같은 「내역」끼리 묶어 보여 주고 고른 것만 할 일로 */
-S.cash=ls.get("desk:cash",null);S.cashPick={};S.cashDone=new Set(ls.get("desk:cashDone",[]));
+S.cash=ls.get("desk:cash",null);S.cashNo=ls.get("desk:cashNo",{});S.cashFilter="all";S.cashDone=new Set(ls.get("desk:cashDone",[]));
 function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=ok;s.onerror=()=>no(new Error("엑셀 읽기 도구를 불러오지 못했습니다"));document.head.append(s)})}
 const CASH_PJ=[[/성과공유회/,"성과공유회"],[/멘토링|멘토/,"모두의 멘토링"],[/운영위원회/,"운영위원회"],[/아카데미/,"모두의 아카데미"],[/레터|래터/,"모두의 레터"],[/2차년도|조정사업|심사/,"2차년도 심사·조정"],[/연차평가/,"1차년도 연차평가"],[/정산|반납|회계감사|변호사/,"1차년도 종료·정산"]];
 async function cashRead(file){
   try{toast("출납부를 읽는 중…");await loadXLSX();
-    const wb=XLSX.read(await file.arrayBuffer(),{type:"array"}),ws=wb.Sheets["현금출납부(필수)"]||wb.Sheets[wb.SheetNames.find(n=>/현금출납부/.test(n))];
+    const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets["현금출납부(필수)"]||wb.Sheets[wb.SheetNames.find(n=>/현금출납부/.test(n))];
     if(!ws)throw new Error("「현금출납부(필수)」 시트를 찾지 못했습니다");
     const A=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
     const day=v=>typeof v==="number"?new Date(Date.UTC(1899,11,30)+v*864e5).toISOString().slice(0,10):String(v).trim().replace(/\./g,"-").replace(/\s/g,"");
@@ -2196,8 +2198,11 @@ async function cashRead(file){
     const g={};blank.forEach(x=>{const k=(x.memo||x.vendor)+"|"+x.d.slice(0,7);const o=g[k]||(g[k]={key:"출납부:"+k,memo:x.memo||x.vendor,sum:0,n:0,from:x.d,to:x.d,vendors:[],rows:[]});
       o.sum+=x.amt;o.n++;if(x.d<o.from)o.from=x.d;if(x.d>o.to)o.to=x.d;if(x.vendor&&!o.vendors.includes(x.vendor))o.vendors.push(x.vendor);o.rows.push(x.row)});
     S.cash={at:new Date().toISOString(),file:file.name,total:rows.length,blank:blank.length,groups:Object.values(g).sort((a,b)=>b.to.localeCompare(a.to))};
-    ls.set("desk:cash",S.cash);S.cashPick={};const cut=new Date(Date.now()-75*864e5).toISOString().slice(0,10);
-    S.cash.groups.forEach(x=>{if(x.sum>0&&x.to>=cut&&!cashHas(x))S.cashPick[x.key]=true});
+    S.cashBuf=buf;S.cashFile=file.name;S.cashSheet=wb.SheetNames.find(n=>wb.Sheets[n]===ws);
+    S.cashLocal={at:S.cash.at,file:S.cash.file,nos:[...new Set(A.slice(4).map(r=>String(r[6]||"").trim()).filter(Boolean))],sums:{}};
+    A.slice(4).forEach(r=>{const no=String(r[6]||"").trim();if(no)S.cashLocal.sums[no]=(S.cashLocal.sums[no]||0)+cashNum(r[3])});
+    S.cash.nos=S.cashLocal.nos;ls.set("desk:cashLocal",S.cashLocal);ls.set("desk:cash",S.cash);
+    Object.keys(S.expPick).filter(k=>k.startsWith("cash:")).forEach(k=>delete S.expPick[k]);
     toast(`결의서번호 빈칸 ${blank.length}줄 → 지출 ${S.cash.groups.length}묶음`);render();syncNow("cash");
   }catch(e){toast("출납부 읽기 실패 · "+e.message,"bad")}
 }
@@ -2205,37 +2210,109 @@ const cashHas=x=>S.cashDone.has(x.key)||(S.data.tasks||[]).some(t=>(t.note||"").
 // 이카운트 결재현황(새 버튼)과 금액이 같으면 「번호 후보」
 const CASH_STOP=/^(지출|지급|위한|운영|운영을|1차년도|2차년도|모두의공모|모두의|결과의|건|및|관련|비용)$/;
 const cashWords=t=>new Set(String(t).replace(/[^가-힣A-Za-z0-9]+/g," ").split(" ").filter(w=>w.length>=2&&!CASH_STOP.test(w)));
-const cashCand=x=>{const A=S.appr;if(!A||!A.rows)return null;
-  const rows=A.rows.filter(r=>r.mine!==false||S.apprUse.includes(r.no));
-  const r=rows.find(r=>r.amt&&+String(r.amt).replace(/[^0-9]/g,"")===x.sum);if(r)return r.no;
-  const w=cashWords(x.memo);let best=null,hit=1;rows.forEach(r=>{const n=[...cashWords(r.title)].filter(t=>w.has(t)).length;if(n>hit){hit=n;best=r}});return best?best.no:null};
+const cashNum=v=>Number(String(v??"").replace(/[^0-9.-]/g,""))||0;
+S.cashLocal=ls.get("desk:cashLocal",null);
+function cashMatch(x){
+  const words=cashWords(x.memo),from=Date.parse(x.from),to=Date.parse(x.to);
+  const candidates=((S.appr&&S.appr.rows)||[]).filter(r=>r.mine!==false||S.apprUse.includes(r.no)).map(r=>{
+    const match=/^(\d{4})\/(\d{2})\/(\d{2})(?:-|$)/.exec(r.no),date=match?Date.parse(match.slice(1).join("-")):NaN;
+    return {r,equal:!!r.amt&&cashNum(r.amt)===cashNum(x.sum),near:date>=from-7*864e5&&date<=to+7*864e5,hit:[...cashWords(r.title)].filter(t=>words.has(t)).length};
+  }).filter(c=>c.equal||c.hit>1).sort((a,b)=>Number(b.equal&&b.near)-Number(a.equal&&a.near)||Number(b.equal)-Number(a.equal)||b.hit-a.hit);
+  const sure=candidates.filter(c=>c.equal&&c.near),chosen=S.cashNo[x.key];
+  return {level:sure.length===1&&(!chosen||chosen===sure[0].r.no)?"sure":candidates.length||chosen?"candidate":"none",candidates:candidates.map(c=>c.r),no:chosen||(sure.length===1?sure[0].r.no:null),manual:!!chosen};
+}
+// 기존 호출부에는 번호 문자열/null을 반환한다. 후보 자체는 자동 기입하지 않는다.
+const cashCand=x=>{const m=cashMatch(x);return m.no||m.candidates[0]?.no||null};
+const cashSelected=x=>!!S.expPick[expSource("cash",x).src];
+function cashSelectionButton(){const el=document.getElementById("cash-add-selected");if(el){const n=(S.cash?.groups||[]).filter(x=>cashSelected(x)&&!cashHas(x)).length;el.disabled=!n;el.textContent="고른 "+n+"건 할 일에 추가"}}
 async function cashAdd(){
-  const sel=S.cash.groups.filter(x=>S.cashPick[x.key]&&!cashHas(x));if(!sel.length)return toast("추가할 묶음을 골라 주세요","bad");
+  const sel=S.cash.groups.filter(x=>cashSelected(x)&&!cashHas(x));if(!sel.length)return toast("추가할 묶음을 골라 주세요","bad");
   if(!S.cfg||S.demo)return toast("예시 모드에서는 추가하지 않습니다","bad");
   let n=0;toast(`할 일 ${sel.length}건을 추가하는 중…`);
   for(const x of sel){const cand=cashCand(x);
     try{await api("add",{kind:"tasks",fields:{t:`지출결의서 작성 — ${x.memo.slice(0,60)} (${x.sum.toLocaleString()}원)`,s:"시작 전",d:TODAY(),c:"모두의공모",y:"예산·회계",
       p:(CASH_PJ.find(([r])=>r.test(x.memo))||[])[1]||"일상 운영",
-      detail:`출납부 ${x.from}${x.to!==x.from?"~"+x.to:""} · ${x.n}줄 · 거래처 ${x.vendors.slice(0,4).join(", ")}${cand?` · 이카운트 금액 일치 기안 ${cand}(번호만 미기입일 수 있음)`:""}`,
+      detail:`출납부 ${x.from}${x.to!==x.from?"~"+x.to:""} · ${x.n}줄 · 거래처 ${x.vendors.slice(0,4).join(", ")}${cand?` · 이카운트 번호 후보 ${cand}(번호만 미기입일 수 있음)`:""}`,
       note:`${x.key} · 출납부 행 ${x.rows.slice(0,12).join(",")}`}});
       S.cashDone.add(x.key);n++}catch(e){toast("추가 실패 · "+e.message,"bad");break}}
-  ls.set("desk:cashDone",[...S.cashDone]);S.cashPick={};toast(`할 일 ${n}건을 추가했습니다`);refresh(true);
+  ls.set("desk:cashDone",[...S.cashDone]);sel.filter(x=>cashHas(x)).forEach(x=>delete S.expPick[expSource("cash",x).src]);toast(`할 일 ${n}건을 추가했습니다`);refresh(true);
+}
+function cashNumber(x){const m=cashMatch(x);
+  if(!m.candidates.length&&!m.no)return h("span",{class:"pill"},"지결 필요");
+  return h("details",null,h("summary",{class:"pill "+(m.level==="sure"?"green":"blue")},m.no||"번호 후보 "+m.candidates.length+"개"),
+    h("select",{"aria-label":"결의서번호 선택",onchange:e=>{if(e.target.value)S.cashNo[x.key]=e.target.value;else delete S.cashNo[x.key];ls.set("desk:cashNo",S.cashNo);render()}},
+      h("option",{value:"",selected:!m.manual},m.level==="sure"?"자동: "+m.no:"후보를 선택하세요"),
+      m.manual&&!m.candidates.some(r=>r.no===m.no)?h("option",{value:m.no,selected:true},m.no):null,
+      m.candidates.map(r=>h("option",{value:r.no,selected:m.manual&&m.no===r.no},r.no+" · "+r.title))));
+}
+function cashAudit(C){const L=S.cashLocal;
+  if(!L||L.at!==C.at||L.file!==C.file)return h("div",{class:"faint"},"출납부를 다시 불러오면 미반영 기안과 금액 차이를 점검합니다.");
+  const rows=(S.appr?.rows||[]),nos=new Set(L.nos),missing=rows.filter(r=>r.mine!==false&&apprState(r).c==="green"&&cashNum(r.amt)&&!nos.has(r.no)&&! /시간외|휴가|출장보고|건강검진|근무/.test(r.title));
+  const diff=rows.filter(r=>cashNum(r.amt)&&Object.hasOwn(L.sums,r.no)&&cashNum(r.amt)!==L.sums[r.no]);
+  return h("div",null,h("details",null,h("summary",null,"출납부 미반영 기안 "+missing.length+"건"),missing.map(r=>h("div",null,r.no+" · "+r.title+" · "+cashNum(r.amt).toLocaleString()+"원"))),
+    h("details",null,h("summary",null,"금액 차이 "+diff.length+"건"),diff.map(r=>h("div",null,r.no+" · 기안 총액 "+cashNum(r.amt).toLocaleString()+"원 · 출납부 합계 "+L.sums[r.no].toLocaleString()+"원 · 차이(출납부−기안) "+(L.sums[r.no]-cashNum(r.amt)).toLocaleString()+"원"))));
 }
 function cashCard(){
-  const C=S.cash,pick=e=>e.currentTarget.files[0]&&cashRead(e.currentTarget.files[0]);
-  const sel=C?C.groups.filter(x=>S.cashPick[x.key]&&!cashHas(x)):[];
-  return card("현금출납부 → 미작성 지결",{icon:"att",count:C?`${agoTxt(C.at)} · ${C.file}`:"결의서번호 빈칸을 할 일로"},
-    h("div",{class:"faint",style:"font-size:12.5px;line-height:1.7"},"「출납부 불러오기」 → ",h("b",null,"F:\\함께일하는재단\\모두의 공모\\★ 재단 현금출납부"),"의 최신 엑셀을 고르세요. 엑셀 파일은 올리지 않고, 결의서번호가 빈 지출 묶음(내역·금액·거래처)만 노션에 저장해 폰에서도 같이 봅니다."),
-    h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},
-      h("label",{class:"btn pri",style:"cursor:pointer"},ic("plus"),"출납부 불러오기",h("input",{type:"file",accept:".xlsx,.xls",style:"display:none",onchange:pick})),
-      C?h("button",{class:"btn go",disabled:!sel.length,onclick:cashAdd},`고른 ${sel.length}건 할 일에 추가`):null),
-    C?h("div",{class:"faint",style:"font-size:12px"},`전체 ${C.total.toLocaleString()}줄 중 결의서번호 빈칸 ${C.blank}줄 · ${C.groups.length}묶음 (최근 75일·금액 있는 것만 미리 골라 둠)`):null,
-    C&&C.groups.length?h("div",{class:"cash"},C.groups.slice(0,60).map(x=>{const has=cashHas(x),cand=cashCand(x);
-      return h("div",{class:"cash-r"+(has?" done":"")},h("input",{type:"checkbox",checked:!!S.cashPick[x.key]&&!has,disabled:has,onchange:e=>{S.cashPick[x.key]=e.target.checked;render()}}),
-        h("div",{class:"body"},expCheck(expSource("cash",x)),h("span",{class:"tt"},x.memo),h("div",{class:"meta"},h("span",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),h("span",null,x.n+"줄"),h("span",null,x.vendors.slice(0,2).join(", ")),
-          has?h("span",{class:"pill green"},"할 일 있음"):null,cand?h("span",{class:"pill blue",title:"이카운트 결재현황에 같은 금액 기안이 있습니다. 출납부에 번호만 적으면 될 수 있어요"},"번호 후보 "+cand):h("span",{class:"pill"},"지결 작성 필요"))),
-        h("b",{class:"num"+(x.sum<=0?" faint":"")},x.sum.toLocaleString()))})):null);
+  const C=S.cash,groups=C?.groups||[],levels=groups.map(x=>cashMatch(x).level),filters=[["all","전체"],["sure","번호 확실"],["candidate","번호 후보"],["none","지결 필요"]];
+  const visible=groups.filter((x,i)=>S.cashFilter==="all"||levels[i]===S.cashFilter),sel=groups.filter(x=>cashSelected(x)&&!cashHas(x));
+  // 두 줄 이상에 공통인 단어 단위 앞부분만 접고 원문은 title로 제공한다.
+  const prefix=x=>{let best="";for(const y of groups){if(x===y)continue;let i=0;while(i<Math.min(x.memo.length,y.memo.length)&&x.memo[i]===y.memo[i])i++;const p=x.memo.slice(0,i),end=p.lastIndexOf(" ");if(end>=10&&end>best.length&&end<x.memo.length-2)best=p.slice(0,end+1)}return best};
+  return card("현금출납부 → 미작성 지결",{icon:"att",count:C?agoTxt(C.at)+" · "+C.file:"결의서번호 빈칸 점검"},
+    h("div",{class:"faint"},"출납부는 브라우저에서 읽으며, 빈 번호 묶음만 노션에 동기화합니다. 후보 번호는 확인 후 선택하세요."),
+    h("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},h("label",{class:"btn pri"},"출납부 불러오기",h("input",{type:"file",accept:".xlsx,.xls",style:"display:none",onchange:e=>{if(e.target.files[0])cashRead(e.target.files[0])}})),
+      C?h("button",{id:"cash-add-selected",class:"btn go",disabled:!sel.length,onclick:cashAdd},"고른 "+sel.length+"건 할 일에 추가"):null,
+      C?h("button",{class:"btn",onclick:cashDownload},"번호 채운 사본 받기"):null),
+    C&&!S.cashBuf?h("div",{class:"faint"},"출납부를 다시 불러와 주세요"):null,
+    C?h("div",{class:"row",style:"gap:6px;flex-wrap:wrap"},filters.map(([k,t])=>h("button",{class:"btn sm"+(S.cashFilter===k?" go":""),"aria-pressed":String(S.cashFilter===k),onclick:()=>{S.cashFilter=k;render()}},t+" "+(k==="all"?groups.length:levels.filter(v=>v===k).length)))):null,
+    C?h("div",{style:"overflow-x:auto"},h("table",{class:"cash-table"},h("thead",null,h("tr",null,["선택","날짜","내용","거래처","금액","번호"].map(t=>h("th",null,t)))),h("tbody",null,visible.map(x=>{const p=prefix(x);return h("tr",null,
+      h("td",null,expCheck(expSource("cash",x))),h("td",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),
+      h("td",{title:x.memo},p?h("span",{class:"faint",title:p},"… "):null,p?x.memo.slice(p.length):x.memo,cashHas(x)?h("span",{class:"pill green"},"할 일 있음"):null),
+      h("td",null,x.vendors.join(", ")),h("td",{class:"num"},x.sum.toLocaleString()),h("td",null,cashNumber(x)))})))):null,
+    C?cashAudit(C):null);
 }
+function loadCashZip(){return window.JSZip?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=ok;s.onerror=()=>no(new Error("사본 생성 도구를 불러오지 못했습니다"));document.head.append(s)})}
+// ZIP의 대상 시트와 styles만 수정한다. 원본 워크북을 SheetJS로 다시 쓰지 않는다.
+async function cashPatch(buf,sheetName,entries){
+  const zip=await JSZip.loadAsync(buf),parse=t=>{const d=new DOMParser().parseFromString(t,"application/xml");if(d.getElementsByTagName("parsererror").length)throw Error("엑셀 XML 오류");return d},serialize=d=>new XMLSerializer().serializeToString(d);
+  const read=async p=>{if(!zip.file(p))throw Error("xlsx 구성 파일 없음: "+p);return parse(await zip.file(p).async("string"))},all=(d,n)=>Array.from(d.getElementsByTagNameNS("*",n)),child=(d,n)=>Array.from(d.childNodes).filter(e=>e.localName===n),ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const wb=await read("xl/workbook.xml"),rels=await read("xl/_rels/workbook.xml.rels"),sheet=all(wb,"sheet").find(e=>e.getAttribute("name")===sheetName);
+  if(!sheet)throw Error("출납부 시트를 찾지 못했습니다");
+  const rid=sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id"),rel=all(rels,"Relationship").find(e=>e.getAttribute("Id")===rid);
+  if(!rel||rel.getAttribute("TargetMode")==="External")throw Error("시트 관계 오류");
+  const parts=(rel.getAttribute("Target").startsWith("/")?rel.getAttribute("Target").slice(1):"xl/"+rel.getAttribute("Target")).split("/"),path=[];
+  for(const p of parts){if(p==="..")path.pop();else if(p&&p!==".")path.push(p)}const target=path.join("/");
+  const doc=await read(target),styles=await read("xl/styles.xml"),fills=all(styles,"fills")[0],xfs=all(styles,"cellXfs")[0];if(!fills||!xfs)throw Error("셀 서식 없음");
+  const make=(d,n)=>d.createElementNS(ns,n),fillId=child(fills,"fill").length,fill=make(styles,"fill"),pattern=make(styles,"patternFill");pattern.setAttribute("patternType","solid");
+  for(const [n,a,v] of [["fgColor","rgb","FFFFFF00"],["bgColor","indexed","64"]]){const e=make(styles,n);e.setAttribute(a,v);pattern.appendChild(e)}fill.appendChild(pattern);fills.appendChild(fill);fills.setAttribute("count",child(fills,"fill").length);
+  const styleMap=new Map(),baseStyles=child(xfs,"xf"),highlight=base=>{base=Number(base)||0;if(!styleMap.has(base)){if(!baseStyles[base])throw Error("기존 셀 서식 오류");const xf=baseStyles[base].cloneNode(true);xf.setAttribute("fillId",fillId);xf.setAttribute("applyFill","1");const i=child(xfs,"xf").length;xfs.appendChild(xf);styleMap.set(base,i)}return styleMap.get(base)};
+  const data=all(doc,"sheetData")[0];if(!data)throw Error("시트 데이터 없음");let count=0,skipped=0;const seen=new Set();
+  let strings=null;
+  for(const item of entries){for(const rn of item.rows){if(!Number.isInteger(rn)||rn<5)throw Error("출납부 행 번호 오류");if(seen.has(rn))continue;seen.add(rn);
+    let row=child(data,"row").find(e=>Number(e.getAttribute("r"))===rn);if(!row)throw Error("원본에 없는 출납부 행: "+rn);
+    let cell=child(row,"c").find(e=>e.getAttribute("r")==="G"+rn);
+    if(cell){const type=cell.getAttribute("t"),vs=all(cell,"v"),txt=all(cell,"t").map(e=>e.textContent).join("");let value=vs.map(e=>e.textContent).join("");
+      if(type==="s"&&value!==""){if(!strings)strings=all(await read("xl/sharedStrings.xml"),"si");value=strings[Number(value)]?.textContent??"?"}
+      if(all(cell,"f").length||String(value).trim()||txt.trim()){skipped++;continue}}
+    else{cell=make(doc,"c");cell.setAttribute("r","G"+rn);const next=child(row,"c").find(e=>{const col=e.getAttribute("r").match(/^[A-Z]+/)?.[0]||"";return col.length>1||col>"G"});row.insertBefore(cell,next||null)}
+    const col=all(doc,"col").find(c=>Number(c.getAttribute("min"))<=7&&Number(c.getAttribute("max"))>=7);
+    const base=cell.hasAttribute("s")?cell.getAttribute("s"):row.getAttribute("customFormat")==="1"?row.getAttribute("s"):col?.getAttribute("style");
+    cell.setAttribute("s",highlight(base));cell.setAttribute("t","inlineStr");while(cell.firstChild)cell.removeChild(cell.firstChild);
+    const is=make(doc,"is"),t=make(doc,"t");t.textContent=item.no;is.appendChild(t);cell.appendChild(is);count++;
+  }}
+  xfs.setAttribute("count",child(xfs,"xf").length);if(count){zip.file(target,serialize(doc));zip.file("xl/styles.xml",serialize(styles))}
+  return {bytes:await zip.generateAsync({type:"uint8array",compression:"DEFLATE"}),count,skipped};
+}
+async function cashDownload(){
+  if(!S.cashBuf)return toast("출납부를 다시 불러와 주세요","bad");
+  if(!/\.xlsx$/i.test(S.cashFile||""))return toast("서식을 보존하려면 xlsx 출납부를 불러와 주세요","bad");
+  if(!S.cashLocal||S.cashLocal.at!==S.cash?.at||S.cashLocal.file!==S.cash?.file)return toast("출납부를 다시 불러와 주세요","bad");
+  const entries=S.cash.groups.map(x=>({rows:x.rows,no:cashMatch(x).no})).filter(x=>x.no);if(!entries.length)return toast("기입할 번호를 먼저 선택해 주세요","bad");
+  try{await loadCashZip();const result=await cashPatch(S.cashBuf,S.cashSheet,entries),url=URL.createObjectURL(new Blob([result.bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})),a=document.createElement("a"),now=new Date();
+    a.href=url;a.download=S.cashFile.replace(/\.xlsx$/i,"")+"_번호기입_"+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0")+".xlsx";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    toast(result.count+"줄에 번호를 채운 사본을 내려받았습니다(원본은 그대로)"+(result.skipped?" · 기존 값 "+result.skipped+"줄 건너뜀":""));
+  }catch(e){toast("사본 생성 실패 · "+e.message,"bad")}
+}
+
 /* ── 통장거래내역 대조 ──
    거래내역·대량이체·출납부 엑셀을 브라우저에서만 읽음(파일은 올리지 않음). 계좌번호·생년월일은 읽지 않고,
    브라우저에는 대조 결과만 보관. 안 맞는 건은 오류로 단정하지 않고 「확인 필요」로 표시 */
