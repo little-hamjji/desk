@@ -2430,11 +2430,15 @@ const SYNC={
 async function syncOut(k){
   const c=SYNC[k],L=c.local();c.busy=true;
   try{
-    const have=new Map(),dup=[],jobs=[];S.data[c.rows].forEach(x=>{if(have.has(x[c.id]))dup.push(x);else have.set(x[c.id],x)}); // 노션에 같은 번호가 여러 줄이면 하나만 남김
+    // 노션 목록은 방금 추가한 줄을 늦게 보여 줄 수 있음 → 5분 안에 추가한 줄은 기억해 두고 다시 추가하지 않음(11/5 겹침 34줄)
+    const now=Date.now();c.recent=(c.recent||[]).filter(x=>now-x._t<300000);
+    const src=[...S.data[c.rows]],ids=new Set(src.map(x=>x.id));c.recent.forEach(x=>{if(!ids.has(x.id))src.push(x)});
+    const have=new Map(),dup=[],jobs=[];src.forEach(x=>{if(have.has(x[c.id]))dup.push(x);else have.set(x[c.id],x)}); // 노션에 같은 번호가 여러 줄이면 하나만 남김
+    const gone=id=>{c.recent=c.recent.filter(x=>x.id!==id)};
     c.list(L).map(c.out).forEach(f=>{const o=have.get(f[c.id]);have.delete(f[c.id]);
-      if(!o)jobs.push(()=>api("add",{kind:k,fields:f}));
+      if(!o)jobs.push(()=>api("add",{kind:k,fields:f}).then(r=>{if(r&&r.id)c.recent.push(Object.assign({},r,{_t:Date.now()}))}));
       else if(Object.keys(f).some(n=>String(f[n]??"")!==String(o[n]??"")))jobs.push(()=>api("update",{kind:k,id:o.id,fields:f}))});
-    if(!c.noTrash)[...have.values(),...dup].forEach(o=>jobs.push(()=>api("trash",{kind:k,id:o.id})));
+    if(!c.noTrash)[...have.values(),...dup].forEach(o=>jobs.push(()=>api("trash",{kind:k,id:o.id}).then(()=>gone(o.id))));
     for(let i=0;i<jobs.length;i+=3)await Promise.all(jobs.slice(i,i+3).map(j=>j()));
     await api("syncMark",{kind:k,meta:c.meta(L)});
     c.busy=false;refresh(true);
