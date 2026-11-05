@@ -2263,7 +2263,8 @@ function cashBudget(detail){
 }
 function cashRowValues(source,no,r,rows,spell){
   const cells={},kinds={},put=(c,v,k)=>{if(v&&!cashOccupied(source.cells[c],source.formulas?.[c])){cells[c]=v;kinds[c]=k}};
-  put("G",no,"sure");put("F",apprTitle(r?.title),"sure");
+  put("G",String(no).replace(/^(\d{4}\/\d{2}\/\d{2})\s*-\s*/,"$1 -"),"sure"); /* 대표님 표기: 2026/10/21 -38 */
+  put("F",apprTitle(r?.title).replace(/의$/,"").trim(),"guess"); /* 내역은 대표님이 구체적으로 다시 쓰는 경우가 많아 추정(11/5 학습) */
   // 목·세목·세세목은 엑셀(출납부)에 실제로 있는 조합만 사용(11/5 대표님: 엑셀이 가장 정확)
   let miss="";const b=cashBudget(r?.detail);
   if(b.J){const freq=new Map();rows.forEach(x=>{const t=x.cells;if(!t.H||!t.I||!t.J)return;const k=cashNorm(t.H)+"|"+cashNorm(t.I)+"|"+cashNorm(t.J),o=freq.get(k);if(o)o.n++;else freq.set(k,{t,n:1})});
@@ -2273,6 +2274,9 @@ function cashRowValues(source,no,r,rows,spell){
     if(hit.length!==1)miss=`엑셀에 없는 과목 · (목) ${b.H||""} (세목) ${b.I||""} (세세목) ${b.J} · 직접 확인`;
     else if(own.some(c=>cashNorm(source.cells[c])!==cashNorm(hit[0][c])))miss="이 줄에 적힌 과목이 기안과 달라 목·세목·세세목은 그대로 둠";
     else ["H","I","J"].forEach(c=>put(c,hit[0][c],"sure"))}
+  else{ /* 기안에 예산과목 줄이 없으면 같은 결의서번호가 붙은 엑셀 줄의 과목을 따름(엑셀 기준) */
+    const z=v=>String(v??"").replace(/\s/g,""),same=rows.filter(x=>x.row!==source.row&&z(x.cells.G)===z(no)&&x.cells.H&&x.cells.I&&x.cells.J),keys=new Set(same.map(x=>cashNorm(x.cells.H)+"|"+cashNorm(x.cells.I)+"|"+cashNorm(x.cells.J)));
+    if(same.length&&keys.size===1&&!["H","I","J"].some(c=>cashOccupied(source.cells[c],source.formulas?.[c])&&cashNorm(source.cells[c])!==cashNorm(same[0].cells[c])))["H","I","J"].forEach(c=>put(c,same[0].cells[c],"sure"))}
   const nz=v=>String(v??"").replace(/\s/g,""),peers=rows.filter(x=>x.row!==source.row&&nz(x.cells.G)===nz(no)),peer=c=>peers.find(x=>x.cells[c])?.cells[c];
   put("K",peer("K")||({"카드전표":"인출","지급증":"송금","기타":"송금","(세금)계산서":"송금"})[source.cells.C],"guess");
   put("L",peer("L")||"관련 기안","guess");return {row:source.row,cells,kinds,miss};
@@ -2298,9 +2302,9 @@ function cashRowPlan(){
     const lines=String(detail||"").split(/\r?\n/),start=lines.findIndex(line=>{const c=line.split("\t").map(x=>x.trim());return c[0]==="계정과목"&&c[2]==="거래처"&&c[3]?.replace(/\s/g,"")==="적요"&&c.at(-1)?.replace(/\s/g,"")==="금액";});
     const out=[];if(start<0)return out;for(const line of lines.slice(start+1)){const c=line.split("\t").map(x=>x.trim());if(c[0]==="총합계")break;if(c.length>=5&&/^[\d,]+$/.test(c.at(-1))&&c[2])out.push({vendor:c[2],amt:num(c.at(-1))});}return out;
   };
-  const plan=new Map(),rows=(S.cashRowsAll||[]).filter(x=>!String(x.cells.G||"").trim()&&!x.formulas?.G&&!/^(입금|재입금)$/.test(String(x.cells.K||"").trim())&&String(x.cells.C||"").trim()!=="수입결의서"&&num(x.cells.D)>0).map(x=>({row:x.row,amt:num(x.cells.D),vendor:norm(x.cells.E),date:day(x.cells.B)}));
+  const plan=new Map(),rows=(S.cashRowsAll||[]).filter(x=>!String(x.cells.G||"").trim()&&!x.formulas?.G&&!(String(x.cells.K||"").trim()==="입금"||String(x.cells.K||"").trim()==="재입금"&&num(x.cells.D)>0)&&String(x.cells.C||"").trim()!=="수입결의서"&&num(x.cells.D)!==0).map(x=>({row:x.row,amt:num(x.cells.D),vendor:norm(x.cells.E),date:day(x.cells.B),memo:String(x.cells.F||"").startsWith("[확인필요]")?"":String(x.cells.F||"")})); // 카드 취소(마이너스)도 대상(11/5 대표님 수기 반영 학습)
   const used=new Set((S.cashLocal?.nos||[]).map(x=>String(x).replace(/\s/g,"")));
-  const drafts=(S.appr?.rows||[]).filter(r=>r.mine!==false||(S.apprUse||[]).includes(r.no)).map(r=>({no:r.no,amt:num(r.amt),date:day(r.no),lines:details(r.detail),taken:new Set(),used:used.has(String(r.no).replace(/\s/g,""))}));
+  const drafts=(S.appr?.rows||[]).filter(r=>r.mine!==false||(S.apprUse||[]).includes(r.no)).map(r=>({no:r.no,title:String(r.title||""),amt:num(r.amt),date:day(r.no),lines:details(r.detail),taken:new Set(),used:used.has(String(r.no).replace(/\s/g,""))}));
   const near=(x,d,n)=>x.date>=d.date-3*864e5&&x.date<=d.date+n*864e5;
   const vendor=(a,b)=>a===b||Math.min(a.length,b.length)>=2&&(a.includes(b)||b.includes(a));
   for(const g of S.cash?.groups||[]){const hits=drafts.filter(d=>d.amt===num(g.sum)&&d.date>=day(g.from)-7*864e5&&d.date<=day(g.to)+7*864e5),no=S.cashNo?.[g.key]||(hits.length===1?hits[0].no:null);
@@ -2311,7 +2315,7 @@ function cashRowPlan(){
     if(hits.length===1){const {d,i}=hits[0];d.taken.add(i);plan.set(x.row,{no:d.no,kind:"sure",why:"명세 일치(거래처·금액)"});}}
   const proposals=[];
   for(const d of drafts){if(d.used||d.amt<=0)continue;
-    const candidates=rows.filter(x=>!plan.has(x.row)&&near(x,d,21)&&Number.isSafeInteger(x.amt)&&x.amt<=d.amt).sort((a,b)=>Math.abs(a.date-d.date)-Math.abs(b.date-d.date)||a.row-b.row).slice(0,20),solutions=[],suffix=Array(candidates.length+1).fill(0);
+    const candidates=rows.filter(x=>!plan.has(x.row)&&near(x,d,21)&&Number.isSafeInteger(x.amt)&&x.amt>0&&x.amt<=d.amt).sort((a,b)=>Math.abs(a.date-d.date)-Math.abs(b.date-d.date)||a.row-b.row).slice(0,20),solutions=[],suffix=Array(candidates.length+1).fill(0);
     for(let i=candidates.length-1;i>=0;i--)suffix[i]=suffix[i+1]+candidates[i].amt;
     let steps=0;const search=(i,sum,pick)=>{if(++steps>200000){solutions.length=2;return}/* 너무 많으면 애매한 것으로 보고 포기 */if(solutions.length===2||sum>d.amt||sum+suffix[i]<d.amt)return;if(sum===d.amt){solutions.push(pick);return;}if(i===candidates.length)return;search(i+1,sum+candidates[i].amt,[...pick,candidates[i].row]);search(i+1,sum,pick);};
     search(0,0,[]);if(solutions.length===1)proposals.push({d,rows:solutions[0]});
@@ -2319,7 +2323,18 @@ function cashRowPlan(){
   const counts=new Map();for(const p of proposals)for(const row of p.rows)counts.set(row,(counts.get(row)||0)+1);
   for(const p of proposals)if(p.rows.every(row=>counts.get(row)===1))for(const row of p.rows)plan.set(row,p.rows.length>1?{no:p.d.no,kind:"sure",why:"합계 일치 "+p.rows.length+"줄"}:{no:p.d.no,kind:"guess",why:"합계 일치 1줄(금액만 같음)"}); // 한 줄 일치는 금액만 같은 것과 같아 추정으로
   for(const x of rows){const p=plan.get(x.row);if(!p?.why.startsWith("합계 일치"))continue;const d=drafts.find(d=>d.no===p.no),i=d.lines.findIndex((l,i)=>!d.taken.has(i)&&l.amt===x.amt);if(i>=0)d.taken.add(i);}
-  for(const x of rows){if(plan.has(x.row))continue;const hits=drafts.filter(d=>!d.used&&near(x,d,45)&&(d.amt===x.amt||d.lines.some((l,i)=>!d.taken.has(i)&&l.amt===x.amt)));
+  // 같은 날 기안: 대표님 수기 반영(11/5)에서 카드 결제·취소·수수료는 결제일과 같은 날짜 기안이 정답이었음
+  const STOPW=/^(모두의공모|모두의|공모|1차년도|2차년도|2025년|위한|운영을|운영에|따른|지출|지급|및|결과의|건|관련|집행)$/;
+  const words=t=>new Set(String(t||"").replace(/[^가-힣A-Za-z0-9]+/g," ").split(" ").filter(w=>w.length>=2&&!STOPW.test(w)));
+  const amtOk=(d,x)=>d.amt===Math.abs(x.amt)||d.lines.some(l=>l.amt===Math.abs(x.amt));
+  const got=new Map();for(const [rn,p] of plan){const x=rows.find(x=>x.row===rn);if(x&&x.amt>0)got.set(p.no,(got.get(p.no)||0)+x.amt)}
+  const full=d=>d.amt>0&&(got.get(d.no)||0)>=d.amt; // 금액을 이미 다 채운 기안은 다시 쓰지 않음
+  for(let pass=0;pass<2;pass++)for(const x of rows){if(plan.has(x.row))continue;const mw=words(x.memo);
+    const hits=drafts.filter(d=>Math.abs(d.date-x.date)<=864e5&&!(x.amt>0&&full(d))).map(d=>{const cancel=/취소/.test(d.title),fee=/수수료/.test(d.title),tw=words(d.title),ok=amtOk(d,x);
+      return {d,ok,score:[...mw].filter(w=>tw.has(w)).length+(ok?3:0)+(x.amt<0&&cancel&&!fee?3:0)-(x.amt>0&&cancel&&!fee?3:0)-(x.amt<0&&(!cancel||fee)?3:0)+(d.date===x.date?2:0)}}).filter(h=>h.score>=2).sort((a,b)=>b.score-a.score);
+    if(hits.length&&(hits.length===1||hits[0].score>hits[1].score)){const d=hits[0].d;plan.set(x.row,{no:d.no,kind:hits[0].ok?"sure":"guess",why:hits[0].ok?"같은 날·금액 일치":x.amt<0?"같은 날 취소 기안":"같은 날·내역 일치"});if(x.amt>0)got.set(d.no,(got.get(d.no)||0)+x.amt)}}
+  for(const x of rows){if(plan.has(x.row)||x.amt<0)continue;let hits=drafts.filter(d=>!d.used&&near(x,d,45)&&(d.amt===x.amt||d.lines.some((l,i)=>!d.taken.has(i)&&l.amt===x.amt)));
+    if(hits.length>1){const dist=d=>Math.abs(d.date-x.date);hits.sort((a,b)=>dist(a)-dist(b));if(dist(hits[0])<=864e5&&dist(hits[0])<dist(hits[1]))hits=[hits[0]]} // 금액 같은 기안이 여럿이면 결제일과 같은 날 기안
     if(hits.length===1){const d=hits[0],i=d.lines.findIndex((l,i)=>!d.taken.has(i)&&l.amt===x.amt);if(i>=0)d.taken.add(i);plan.set(x.row,{no:d.no,kind:"guess",why:"금액만 일치"});}}
   cashRowPlan.k=memo;cashRowPlan.v=plan;return plan;
 }
