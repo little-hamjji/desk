@@ -1911,6 +1911,35 @@ function expRows(e,save){const fields=[["date","날짜"],["vendor","거래처"],
 }
 function expAttachments(e){return [...new Set([...(e.files||[]),...(e.attachments||[]).map(a=>a.file),...(e.rows||[]).map(r=>r.file)].filter(Boolean))]}
 function expFileKey(e,name){return JSON.stringify([e.key,name])}
+function expDelete(key){
+  const e=S.exps[key];if(!e)return;
+  if(e.up&&S.expFiles[e.key]){URL.revokeObjectURL(S.expFiles[e.key]);delete S.expFiles[e.key]}
+  if(e.multi)for(const f of expAttachments(e)){const k=expFileKey(e,f);if(S.expFiles[k]){URL.revokeObjectURL(S.expFiles[k]);delete S.expFiles[k]}}
+  delete S.exps[key];
+  if(S.sel&&S.sel.kind==="exp"&&S.sel.key===key)S.sel=null;
+}
+function expDedupeBundles(){
+  const bundles=Object.entries(S.exps).filter(([,e])=>e.multi),parent=new Map(bundles.map(([key])=>[key,key])),sources=new Map();
+  const root=key=>{let r=key;while(parent.get(r)!==r)r=parent.get(r);while(key!==r){const next=parent.get(key);parent.set(key,r);key=next}return r};
+  for(const [key,e] of bundles)for(const row of e.rows||[]){
+    const src=row.src;if(typeof src!=="string"||!src||src.startsWith("manual:"))continue;
+    if(sources.has(src))parent.set(root(key),root(sources.get(src)));else sources.set(src,key);
+  }
+  const groups=new Map(),rows=S.appr&&S.appr.rows||[];
+  const at=(key,e)=>e.at==null?Number(key.split(":").pop())||0:typeof e.at==="number"?e.at:Date.parse(e.at)||Number(e.at)||0;
+  const rank=(key,e)=>[expApprovalMatches(e,rows).length===1?1:0,e.ready===true?1:0,at(key,e)];
+  for(const [key,e] of bundles){const r=root(key);if(!groups.has(r))groups.set(r,[]);groups.get(r).push({key,rank:rank(key,e)})}
+  let removed=0;
+  for(const group of groups.values()){
+    group.sort((a,b)=>b.rank[0]-a.rank[0]||b.rank[1]-a.rank[1]||b.rank[2]-a.rank[2]);
+    for(const {key} of group.slice(1)){expDelete(key);removed++}
+  }
+  return removed;
+}
+function expApprovalMatches(e,rows){
+  const title=String(e.title||"").trim();
+  return title&&!title.includes("○○")?rows.filter(r=>String(r.title||"").trim()===title):[];
+}
 function expAttach(e,save){const input=h("input",{type:"file",multiple:true,onchange:ev=>{
   for(const f of ev.target.files){const k=expFileKey(e,f.name);if(S.expFiles[k])URL.revokeObjectURL(S.expFiles[k]);S.expFiles[k]=URL.createObjectURL(f);e.files=[...new Set([...(e.files||[]),f.name])]}
   save();render()
@@ -1994,7 +2023,7 @@ function expSheet(){
     h("footer",null,e.multi?h("button",{class:"btn",onclick:()=>expAutoFill(e,save)},"자동 채우기"):null,h("button",{class:"btn go",onclick:()=>{if(!(e.multi?expSum(e):amt)||!e.title)return toast("제목과 금액은 꼭 적어 주세요","bad");
         e.ready=true;save();pfCopy(JSON.stringify(e.multi?{hamkkun:"exp",v:3,title:e.title,body:expBody(e),amt:expSum(e),rows:e.rows.filter(r=>!String(r.src||"").startsWith("manual:")||String(r.amt??"").trim()!=="").map(r=>({...r})),files:expAttachments(e)}:{hamkkun:"exp",v:2,title:e.title,body:expBody(e),vendor:e.vendor,bizno:e.bizno,amt,memo:e.memo||e.purpose,file:e.file}),"복사했습니다 · 이카운트 복사 창에서 「햄꾼 채우기」를 누르세요"+(e.multi?" · 즐겨찾기 「햄꾼 채우기」를 다시 끌어다 놓았는지 확인":""));render()}},"이카운트용 복사"),
       h("button",{class:"btn",onclick:()=>addTask({t:"지출결의서 작성 — "+(e.vendor||e.fname||e.subj),d:TODAY(),y:"예산·회계",note:(e.up?"파일: ":"스캔: ")+e.file})},"할 일로"),
-      h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}if(e.up&&S.expFiles[e.key]){URL.revokeObjectURL(S.expFiles[e.key]);delete S.expFiles[e.key]}if(e.multi)for(const f of expAttachments(e)){const k=expFileKey(e,f);if(S.expFiles[k]){URL.revokeObjectURL(S.expFiles[k]);delete S.expFiles[k]}}delete S.exps[e.key];ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
+      h("button",{class:"btn ghost",onclick:ev=>{const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더 누르면 지움";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="지우기"}},3000);return}expDelete(e.key);ls.set("desk:exps",S.exps);closeSheet()}},"지우기")));
 }
 
 /* ── 이카운트 즐겨찾기 버튼(북마클릿): 이카운트 화면에서 실행되는 코드 ── */
@@ -2091,13 +2120,12 @@ function apprState(r){
 function apprCard(){
   const A=S.appr,ups=Object.values(S.exps).filter(e=>e.up||e.multi);
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
-    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);toast(d.rows.length+"건을 불러왔습니다");render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
+    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);const removed=expDedupeBundles();ls.set("desk:exps",S.exps);toast(d.rows.length+"건을 불러왔습니다"+(removed?" · 중복 지결 묶음 "+removed+"개 정리":""));render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
   const rows=A&&A.rows?A.rows.slice().sort((a,b)=>{const o={red:0,orange:1,blue:2,"":3,green:4};return o[apprState(a).c]-o[apprState(b).c]}):[];
   const md=d=>d?+d.slice(5,7)+"/"+ +d.slice(8,10):"";
   const preparedPill=e=>{
-    const title=String(e.title||"").trim();
-    const matches=title&&!title.includes("○○")?rows.filter(r=>String(r.title||"").trim()===title):[];
+    const matches=expApprovalMatches(e,rows);
     return matches.length>1?h("span",{class:"pill orange"},"같은 제목 "+matches.length+"건 확인"):
       matches.length===1?h("span",{class:"pill green"},"상신됨 · "+matches[0].no):
       h("span",{class:"pill "+(e.ready?"green":"")},e.ready?"준비됨":"준비 중");
