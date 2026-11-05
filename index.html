@@ -2146,7 +2146,7 @@ function apprCard(){
       h("button",{class:"btn",onclick:()=>expPick()},"파일로 지결 준비")),
     // 지결 묶음: 이카운트 결재내역에 같은 금액 기안이 있으면 올라간 것으로 보고 숨김(11/5 대표님)
     ...(()=>{const won=v=>+String(v??"").replace(/[^0-9]/g,"")||0,eAmt=e=>e.multi?expSum(e):won(e.amt),
-      done=new Set(((A&&A.rows)||[]).map(r=>won(r.amt)).filter(Boolean)),shown=ups.filter(e=>!done.has(eAmt(e))),hid=ups.length-shown.length;
+      done=new Set(((A&&A.rows)||[]).filter(r=>r.mine!==false).map(r=>won(r.amt)).filter(Boolean)),shown=ups.filter(e=>!done.has(eAmt(e))),hid=ups.length-shown.length;
       const del=(ev,e)=>{ev.stopPropagation();const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="삭제"}},3000);return}expDelete(e.key);ls.set("desk:exps",S.exps);toast("지결 묶음을 삭제했습니다");render()};
       return [shown.length?h("div",{class:"appr"},shown.map(e=>h("div",{class:"appr-r",role:"button",tabindex:0,onclick:()=>{S.sel={kind:"exp",key:e.key};render()},onkeydown:ev=>{if(ev.target===ev.currentTarget&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();S.sel={kind:"exp",key:e.key};render()}}},
         h("div",{class:"appr-h"},h("span",{class:"tt"},e.multi?"지결 묶음 · "+e.rows.length+"건":e.vendor||e.fname),h("span",{class:"pill"},eAmt(e).toLocaleString()+"원"),preparedPill(e),h("button",{class:"btn ghost sm",onclick:ev=>del(ev,e)},"삭제"))))):null,
