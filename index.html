@@ -2052,7 +2052,8 @@ function hkStatus(){(async()=>{
   const all=[...document.querySelectorAll("tbody tr")].filter(tr=>tr.offsetParent&&/\d{4}\/\d{2}\/\d{2}-\d+/.test(tr.innerText));
   if(!all.length){say("결재 목록이 보이지 않습니다. 「내결재관리 → 진행중」에서 눌러 주세요.");return}
   const mine=all.filter(tr=>[...tr.querySelectorAll("td")].some(td=>td.innerText.trim()===ME));
-  const rows=(mine.length?mine:all).slice(0,MAX),out=[];
+  let skipped=0;
+  const rows=(mine.length?mine:all).filter(tr=>{if([...tr.querySelectorAll("td")].some(td=>td.innerText.trim()==="기안중")){skipped++;return false}return true}).slice(0,MAX),out=[];
   for(let i=0;i<rows.length;i++){const tr=rows[i];say(`결재 단계 확인 중… ${i+1}/${rows.length}\n(결재가 끝난 문서는 다음부터 열지 않아 빨라집니다)`,1);
     const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
     const big=[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);big.querySelectorAll(".label").forEach(x=>x.remove());
@@ -2070,7 +2071,7 @@ function hkStatus(){(async()=>{
       for(let k=0;k<6&&open();k++){const cl=[...document.querySelectorAll("button")].filter(b=>b.offsetParent&&b.innerText.trim()==="닫기");if(cl.length)cl[cl.length-1].click();await sleep(600)}}
     out.push({no,title,st,steps,amt,files,detail});if(steps.length&&steps.every(x=>x.d)){cache[no]={steps,amt,files,detail};try{localStorage.setItem("hkApprCache",JSON.stringify(cache))}catch(e){}}}
   const tj=Array.prototype.toJSON;delete Array.prototype.toJSON;const txt=JSON.stringify({hamkkun:"appr",v:2,at:new Date().toISOString(),rows:out});if(tj)Array.prototype.toJSON=tj;
-  try{await navigator.clipboard.writeText(txt);say(out.length+"건의 결재 단계를 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요.")}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
+  try{await navigator.clipboard.writeText(txt);say(out.length+"건의 결재 단계를 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요."+(skipped?" (기안중 "+skipped+"건은 건너뜀)":""))}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요",txt)}
 })()}
 const bmk=fn=>"javascript:"+encodeURIComponent("("+fn.toString()+")()");
 const apprFix=d=>{if(d&&typeof d.rows==="string"){try{d.rows=JSON.parse(d.rows)}catch(e){d.rows=[]}}if(d&&!Array.isArray(d.rows))d.rows=[];return d};
