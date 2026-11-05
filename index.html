@@ -2264,21 +2264,31 @@ function cashBudget(detail){
 function cashRowValues(source,no,r,rows,spell){
   const cells={},kinds={},put=(c,v,k)=>{if(v&&!cashOccupied(source.cells[c],source.formulas?.[c])){cells[c]=v;kinds[c]=k}};
   put("G",no,"sure");put("F",apprTitle(r?.title),"sure");
-  for(const [c,v] of Object.entries(cashBudget(r?.detail))){const known=(spell[c]||[]).find(t=>cashNorm(t)===cashNorm(v));put(c,known||v,known?"sure":"guess")}
+  // 목·세목·세세목은 엑셀(출납부)에 실제로 있는 조합만 사용(11/5 대표님: 엑셀이 가장 정확)
+  let miss="";const b=cashBudget(r?.detail);
+  if(b.J){const freq=new Map();rows.forEach(x=>{const t=x.cells;if(!t.H||!t.I||!t.J)return;const k=cashNorm(t.H)+"|"+cashNorm(t.I)+"|"+cashNorm(t.J),o=freq.get(k);if(o)o.n++;else freq.set(k,{t,n:1})});
+    const tri=[...freq.values()].map(o=>o.t),eq=(t,c)=>cashNorm(t[c])===cashNorm(b[c]);
+    let hit=tri.filter(t=>eq(t,"H")&&eq(t,"I")&&eq(t,"J"));if(!hit.length)hit=tri.filter(t=>eq(t,"J"));
+    const own=["H","I","J"].filter(c=>cashOccupied(source.cells[c],source.formulas?.[c]));
+    if(hit.length!==1)miss=`엑셀에 없는 과목 · (목) ${b.H||""} (세목) ${b.I||""} (세세목) ${b.J} · 직접 확인`;
+    else if(own.some(c=>cashNorm(source.cells[c])!==cashNorm(hit[0][c])))miss="이 줄에 적힌 과목이 기안과 달라 목·세목·세세목은 그대로 둠";
+    else ["H","I","J"].forEach(c=>put(c,hit[0][c],"sure"))}
   const nz=v=>String(v??"").replace(/\s/g,""),peers=rows.filter(x=>x.row!==source.row&&nz(x.cells.G)===nz(no)),peer=c=>peers.find(x=>x.cells[c])?.cells[c];
   put("K",peer("K")||({"카드전표":"인출","지급증":"송금","기타":"송금","(세금)계산서":"송금"})[source.cells.C],"guess");
-  put("L",peer("L")||"관련 기안","guess");return {row:source.row,cells,kinds};
+  put("L",peer("L")||"관련 기안","guess");return {row:source.row,cells,kinds,miss};
 }
 function cashEntries(){
   const rows=S.cashRowsAll||[],eligible=(S.appr?.rows||[]).filter(r=>r.mine!==false||S.apprUse.includes(r.no)),entries=[];
   for(const group of S.cash?.groups||[]){const no=cashMatch(group).no,r=eligible.find(r=>r.no===no);if(!no||!r)continue;
     for(const rn of group.rows){const source=rows.find(x=>x.row===rn);if(source)entries.push(cashRowValues(source,no,r,rows,S.cashSpell||{}))}}
-  return entries.filter(e=>Object.keys(e.cells).length);
+  return entries.filter(e=>Object.keys(e.cells).length||e.miss);
 }
 function cashPreview(){
   if(!S.cashBuf)return null;
   const items=cashEntries().flatMap(e=>Object.entries(e.cells).sort(([a],[b])=>a.localeCompare(b)).map(([col,value])=>({row:e.row,col,value,kind:e.kinds[col]}))),sure=items.filter(x=>x.kind==="sure").length;
-  return h("details",null,h("summary",null,"채울 칸 "+items.length+"개 (기안 근거 "+sure+" · 추정 "+(items.length-sure)+")"),items.map(x=>h("div",null,x.row+"행 · "+x.col+" · "+x.value+" · "+(x.kind==="sure"?"기안 근거":"추정"))));
+  const miss=cashEntries().filter(e=>e.miss);
+  return h("details",null,h("summary",null,"채울 칸 "+items.length+"개 (기안·엑셀 근거 "+sure+" · 추정 "+(items.length-sure)+")"+(miss.length?" · 과목 확인 필요 "+miss.length+"줄":"")),
+    miss.map(e=>h("div",{style:"color:#ff9f0a"},e.row+"행 · "+e.miss)),items.map(x=>h("div",null,x.row+"행 · "+x.col+" · "+x.value+" · "+(x.kind==="sure"?"근거 있음":"추정"))));
 }
 function cashCard(){
   const C=S.cash,groups=C?.groups||[],levels=groups.map(x=>cashMatch(x).level),filters=[["all","전체"],["sure","번호 확실"],["candidate","번호 후보"],["none","지결 필요"]];
