@@ -2239,9 +2239,9 @@ async function cashAdd(){
       S.cashDone.add(x.key);n++}catch(e){toast("추가 실패 · "+e.message,"bad");break}}
   ls.set("desk:cashDone",[...S.cashDone]);sel.filter(x=>cashHas(x)).forEach(x=>delete S.expPick[expSource("cash",x).src]);toast(`할 일 ${n}건을 추가했습니다`);refresh(true);
 }
-function cashNumber(x){const m=cashMatch(x);
-  if(!m.candidates.length&&!m.no)return h("span",{class:"pill"},"지결 필요");
-  return h("details",null,h("summary",{class:"pill "+(m.level==="sure"?"green":"blue")},m.no||"번호 후보 "+m.candidates.length+"개"),
+function cashNumber(x,plan=cashRowPlan()){const m=cashMatch(x),n=x.rows.filter(row=>plan.has(row)).length,badge=n?h("small",{class:"faint"},"줄별 "+n+"/"+x.rows.length):null;
+  if(!m.candidates.length&&!m.no)return h("span",null,h("span",{class:"pill"},"지결 필요"),badge);
+  return h("details",null,h("summary",{class:"pill "+(m.level==="sure"?"green":"blue")},m.no||"번호 후보 "+m.candidates.length+"개",badge),
     h("select",{"aria-label":"결의서번호 선택",onchange:e=>{if(e.target.value)S.cashNo[x.key]=e.target.value;else delete S.cashNo[x.key];ls.set("desk:cashNo",S.cashNo);render()}},
       h("option",{value:"",selected:!m.manual},m.level==="sure"?"자동: "+m.no:"후보를 선택하세요"),
       m.manual&&!m.candidates.some(r=>r.no===m.no)?h("option",{value:m.no,selected:true},m.no):null,
@@ -2277,22 +2277,70 @@ function cashRowValues(source,no,r,rows,spell){
   put("K",peer("K")||({"카드전표":"인출","지급증":"송금","기타":"송금","(세금)계산서":"송금"})[source.cells.C],"guess");
   put("L",peer("L")||"관련 기안","guess");return {row:source.row,cells,kinds,miss};
 }
+// Pure parsers/planner: only S is external, so these functions can be evaluated in Node.
+function cashDetails(detail){
+  const lines=String(detail||"").split(/\r?\n/),start=lines.findIndex(line=>{
+    const c=line.split("\t").map(x=>x.trim());return c[0]==="계정과목"&&c[2]==="거래처"&&c[3]?.replace(/\s/g,"")==="적요"&&c.at(-1)?.replace(/\s/g,"")==="금액";
+  });
+  if(start<0)return [];
+  const out=[];
+  for(const line of lines.slice(start+1)){const c=line.split("\t").map(x=>x.trim());if(c[0]==="총합계")break;
+    if(c.length>=5&&/^[\d,]+$/.test(c.at(-1))&&c[2])out.push({vendor:c[2],memo:c[3],amt:Number(c.at(-1).replace(/,/g,""))});}
+  return out;
+}
+function cashRowPlan(){
+  // 화면을 그릴 때마다 다시 계산하지 않도록 입력이 같으면 이전 결과 재사용(합계 탐색이 무거움)
+  const memo=JSON.stringify([S.cash?.at,S.cashRowsAll?.length,S.appr?.at,S.appr?.rows?.length,S.cashNo,S.apprUse]);if(cashRowPlan.k===memo)return cashRowPlan.v;
+  const norm=v=>String(v??"").replace(/[\s_>\-]/g,""),num=v=>Number(String(v??"").replace(/[^0-9.-]/g,""))||0;
+  const day=v=>{const s=String(v??"").trim();if(!s)return NaN;if(/^\d+(?:\.\d+)?$/.test(s))return Date.UTC(1899,11,30)+Math.floor(Number(s))*864e5;
+    const m=/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/.exec(s);return m?Date.UTC(+m[1],+m[2]-1,+m[3]):NaN;};
+  const details=detail=>{
+    const lines=String(detail||"").split(/\r?\n/),start=lines.findIndex(line=>{const c=line.split("\t").map(x=>x.trim());return c[0]==="계정과목"&&c[2]==="거래처"&&c[3]?.replace(/\s/g,"")==="적요"&&c.at(-1)?.replace(/\s/g,"")==="금액";});
+    const out=[];if(start<0)return out;for(const line of lines.slice(start+1)){const c=line.split("\t").map(x=>x.trim());if(c[0]==="총합계")break;if(c.length>=5&&/^[\d,]+$/.test(c.at(-1))&&c[2])out.push({vendor:c[2],amt:num(c.at(-1))});}return out;
+  };
+  const plan=new Map(),rows=(S.cashRowsAll||[]).filter(x=>!String(x.cells.G||"").trim()&&!x.formulas?.G&&!/^(입금|재입금)$/.test(String(x.cells.K||"").trim())&&String(x.cells.C||"").trim()!=="수입결의서"&&num(x.cells.D)>0).map(x=>({row:x.row,amt:num(x.cells.D),vendor:norm(x.cells.E),date:day(x.cells.B)}));
+  const used=new Set((S.cashLocal?.nos||[]).map(x=>String(x).replace(/\s/g,"")));
+  const drafts=(S.appr?.rows||[]).filter(r=>r.mine!==false||(S.apprUse||[]).includes(r.no)).map(r=>({no:r.no,amt:num(r.amt),date:day(r.no),lines:details(r.detail),taken:new Set(),used:used.has(String(r.no).replace(/\s/g,""))}));
+  const near=(x,d,n)=>x.date>=d.date-3*864e5&&x.date<=d.date+n*864e5;
+  const vendor=(a,b)=>a===b||Math.min(a.length,b.length)>=2&&(a.includes(b)||b.includes(a));
+  for(const g of S.cash?.groups||[]){const hits=drafts.filter(d=>d.amt===num(g.sum)&&d.date>=day(g.from)-7*864e5&&d.date<=day(g.to)+7*864e5),no=S.cashNo?.[g.key]||(hits.length===1?hits[0].no:null);
+    if(no&&drafts.some(d=>d.no===no))for(const x of rows.filter(x=>g.rows.includes(x.row)))plan.set(x.row,{no,kind:"sure",why:S.cashNo?.[g.key]?"묶음 선택":"묶음 합계 일치"});}
+  // Reserve detail lines already represented by a higher-priority group assignment.
+  for(const x of rows){const p=plan.get(x.row);if(!p)continue;const d=drafts.find(d=>d.no===p.no),i=d.lines.findIndex((l,i)=>!d.taken.has(i)&&l.amt===x.amt&&vendor(x.vendor,norm(l.vendor)));if(i>=0)d.taken.add(i);}
+  for(const x of rows){if(plan.has(x.row))continue;const hits=drafts.filter(d=>near(x,d,21)).map(d=>({d,i:d.lines.findIndex((l,i)=>!d.taken.has(i)&&l.amt===x.amt&&vendor(x.vendor,norm(l.vendor)))})).filter(h=>h.i>=0);
+    if(hits.length===1){const {d,i}=hits[0];d.taken.add(i);plan.set(x.row,{no:d.no,kind:"sure",why:"명세 일치(거래처·금액)"});}}
+  const proposals=[];
+  for(const d of drafts){if(d.used||d.amt<=0)continue;
+    const candidates=rows.filter(x=>!plan.has(x.row)&&near(x,d,21)&&Number.isSafeInteger(x.amt)&&x.amt<=d.amt).sort((a,b)=>Math.abs(a.date-d.date)-Math.abs(b.date-d.date)||a.row-b.row).slice(0,20),solutions=[],suffix=Array(candidates.length+1).fill(0);
+    for(let i=candidates.length-1;i>=0;i--)suffix[i]=suffix[i+1]+candidates[i].amt;
+    let steps=0;const search=(i,sum,pick)=>{if(++steps>200000){solutions.length=2;return}/* 너무 많으면 애매한 것으로 보고 포기 */if(solutions.length===2||sum>d.amt||sum+suffix[i]<d.amt)return;if(sum===d.amt){solutions.push(pick);return;}if(i===candidates.length)return;search(i+1,sum+candidates[i].amt,[...pick,candidates[i].row]);search(i+1,sum,pick);};
+    search(0,0,[]);if(solutions.length===1)proposals.push({d,rows:solutions[0]});
+  }
+  const counts=new Map();for(const p of proposals)for(const row of p.rows)counts.set(row,(counts.get(row)||0)+1);
+  for(const p of proposals)if(p.rows.every(row=>counts.get(row)===1))for(const row of p.rows)plan.set(row,p.rows.length>1?{no:p.d.no,kind:"sure",why:"합계 일치 "+p.rows.length+"줄"}:{no:p.d.no,kind:"guess",why:"합계 일치 1줄(금액만 같음)"}); // 한 줄 일치는 금액만 같은 것과 같아 추정으로
+  for(const x of rows){const p=plan.get(x.row);if(!p?.why.startsWith("합계 일치"))continue;const d=drafts.find(d=>d.no===p.no),i=d.lines.findIndex((l,i)=>!d.taken.has(i)&&l.amt===x.amt);if(i>=0)d.taken.add(i);}
+  for(const x of rows){if(plan.has(x.row))continue;const hits=drafts.filter(d=>!d.used&&near(x,d,45)&&(d.amt===x.amt||d.lines.some((l,i)=>!d.taken.has(i)&&l.amt===x.amt)));
+    if(hits.length===1){const d=hits[0],i=d.lines.findIndex((l,i)=>!d.taken.has(i)&&l.amt===x.amt);if(i>=0)d.taken.add(i);plan.set(x.row,{no:d.no,kind:"guess",why:"금액만 일치"});}}
+  cashRowPlan.k=memo;cashRowPlan.v=plan;return plan;
+}
 function cashEntries(){
   const rows=S.cashRowsAll||[],eligible=(S.appr?.rows||[]).filter(r=>r.mine!==false||S.apprUse.includes(r.no)),entries=[];
-  for(const group of S.cash?.groups||[]){const no=cashMatch(group).no,r=eligible.find(r=>r.no===no);if(!no||!r)continue;
-    for(const rn of group.rows){const source=rows.find(x=>x.row===rn);if(source)entries.push(cashRowValues(source,no,r,rows,S.cashSpell||{}))}}
+  for(const [rn,p] of cashRowPlan()){const r=eligible.find(r=>r.no===p.no),source=rows.find(x=>x.row===rn);if(!r||!source)continue;
+    const e=cashRowValues(source,p.no,r,rows,S.cashSpell||{});e.why=p.why;e.kind=p.kind;
+    if(p.kind==="guess")Object.keys(e.kinds).forEach(c=>e.kinds[c]="guess");entries.push(e);}
   return entries.filter(e=>Object.keys(e.cells).length||e.miss);
 }
 function cashPreview(){
   if(!S.cashBuf)return null;
-  const items=cashEntries().flatMap(e=>Object.entries(e.cells).sort(([a],[b])=>a.localeCompare(b)).map(([col,value])=>({row:e.row,col,value,kind:e.kinds[col]}))),sure=items.filter(x=>x.kind==="sure").length;
-  const miss=cashEntries().filter(e=>e.miss);
-  return h("details",null,h("summary",null,"채울 칸 "+items.length+"개 (기안·엑셀 근거 "+sure+" · 추정 "+(items.length-sure)+")"+(miss.length?" · 과목 확인 필요 "+miss.length+"줄":"")),
+  const entries=cashEntries(),items=entries.flatMap(e=>Object.entries(e.cells).sort(([a],[b])=>a.localeCompare(b)).map(([col,value])=>({row:e.row,col,value,kind:e.kinds[col]}))),sure=entries.filter(e=>e.kind==="sure").length;
+  const miss=entries.filter(e=>e.miss);
+  return h("details",null,h("summary",null,"채울 칸 "+items.length+"개 · 번호 확실 "+sure+"줄 · 추정 "+(entries.length-sure)+"줄"+(miss.length?" · 과목 확인 필요 "+miss.length+"줄":"")),
+    entries.map(e=>h("div",null,e.row+"행 · "+e.why)),
     miss.map(e=>h("div",{style:"color:#ff9f0a"},e.row+"행 · "+e.miss)),items.map(x=>h("div",null,x.row+"행 · "+x.col+" · "+x.value+" · "+(x.kind==="sure"?"근거 있음":"추정"))));
 }
 function cashCard(){
   const C=S.cash,groups=C?.groups||[],levels=groups.map(x=>cashMatch(x).level),filters=[["all","전체"],["sure","번호 확실"],["candidate","번호 후보"],["none","지결 필요"]];
-  const visible=groups.filter((x,i)=>S.cashFilter==="all"||levels[i]===S.cashFilter),sel=groups.filter(x=>cashSelected(x)&&!cashHas(x));
+  const plan=cashRowPlan(),visible=groups.filter((x,i)=>S.cashFilter==="all"||levels[i]===S.cashFilter),sel=groups.filter(x=>cashSelected(x)&&!cashHas(x));
   // 두 줄 이상에 공통인 단어 단위 앞부분만 접고 원문은 title로 제공한다.
   const prefix=x=>{let best="";for(const y of groups){if(x===y)continue;let i=0;while(i<Math.min(x.memo.length,y.memo.length)&&x.memo[i]===y.memo[i])i++;const p=x.memo.slice(0,i),end=p.lastIndexOf(" ");if(end>=10&&end>best.length&&end<x.memo.length-2)best=p.slice(0,end+1)}return best};
   return card("현금출납부 → 미작성 지결",{icon:"att",count:C?agoTxt(C.at)+" · "+C.file:"결의서번호 빈칸 점검"},
@@ -2305,7 +2353,7 @@ function cashCard(){
     C?h("div",{style:"overflow-x:auto"},h("table",{class:"cash-table"},h("thead",null,h("tr",null,["선택","날짜","내용","거래처","금액","번호"].map(t=>h("th",null,t)))),h("tbody",null,visible.map(x=>{const p=prefix(x);return h("tr",null,
       h("td",null,expCheck(expSource("cash",x))),h("td",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),
       h("td",{title:x.memo},p?h("span",{class:"faint",title:p},"… "):null,p?x.memo.slice(p.length):x.memo,cashHas(x)?h("span",{class:"pill green"},"할 일 있음"):null),
-      h("td",null,x.vendors.join(", ")),h("td",{class:"num"},x.sum.toLocaleString()),h("td",null,cashNumber(x)))})))):null,
+      h("td",null,x.vendors.join(", ")),h("td",{class:"num"},x.sum.toLocaleString()),h("td",null,cashNumber(x,plan)))})))):null,
     C?cashPreview():null,
     C?cashAudit(C):null);
 }
