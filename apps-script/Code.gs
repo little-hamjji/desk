@@ -36,7 +36,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-05a'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-05b'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -528,7 +528,7 @@ function gongFields(folder, files, at) {
   if (main) {
     const text = gongText(main.getBlob()), lines = text.split('\n').map(x => x.trim());
     lines.forEach(line => {
-      let v = line.match(/^수\s*신\s*[:：]?\s*(.+)/); if (v) f.to = v[1];
+      let v = line.match(/^수\s*신(?!\s*자)\s*[:：]?\s*(.+)/); if (v && !f.to) f.to = v[1].trim(); // 「수신자 참조」 목록 줄 제외
       v = line.match(/^제\s*목\s*[:：]?\s*(.+)/); if (v) f.t = v[1];
     });
     const issue = text.match(/시행\s*창업육성팀\s*(\d{4}-\d{3})\s*\(\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s*\)/);
@@ -554,7 +554,7 @@ function gongFields(folder, files, at) {
   f.warn = warnings.join(' · ');
   return f;
 }
-function gongScan({ cursor } = {}) {
+function gongScan({ cursor, force } = {}) { // force: 바뀌지 않은 폴더도 다시 해석(규칙 수정 후 1회)
   if (!hasNotion()) throw new Error('개인 서버에서 실행해 주세요');
   const lock = LockService.getScriptLock(); lock.waitLock(8000);
   try {
@@ -576,7 +576,7 @@ function gongScan({ cursor } = {}) {
         while (fi.hasNext()) { const file = fi.next(); files.push(file); at = Math.max(at, file.getLastUpdated().getTime()); }
         at = new Date(at).toISOString();
         const old = have.get(folder.getId()), names = files.map(f => f.getName()).sort().join('\n');
-        if (!old || Date.parse(old.at) !== Date.parse(at) || old.files !== names || (old.warn || '').includes('드라이브에 없음')) {
+        if (force || !old || Date.parse(old.at) !== Date.parse(at) || old.files !== names || (old.warn || '').includes('드라이브에 없음')) {
           const fields = gongFields(folder, files, at);
           if (old) { notion('pages/' + old.id, 'patch', { properties: props('gong', fields) }); updated++; }
           else {
