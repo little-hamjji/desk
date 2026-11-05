@@ -35,7 +35,7 @@ const DB = {
 };
 // 회사 계정(chlee@hamkke.org)에는 NOTION_TOKEN 없이 PASS만 넣고 배포 → 메일·캘린더만 담당
 const NV = '2022-06-28';
-const VERSION = '2026-11-03a'; // 대시보드 「원인 확인」에 표시
+const VERSION = '2026-11-05a'; // 대시보드 「원인 확인」에 표시
 // 스캔본을 PC 폴더(개인 드라이브 G:\내 드라이브\CLUDE\클로드 작업물(회사컴)\스캔본\월)로 보관
 const SCAN_DIR = ['CLUDE', '클로드 작업물(회사컴)', '스캔본'];
 const SCAN_FROM = 'ascan@sindate.cafe24.com'; // 회사 복합기 스캔 메일
@@ -188,7 +188,8 @@ const MAP = {
   news:  { t: ['제목', 'title'], d: ['날짜', null], got: ['수집일', null], src: ['매체', null], kind: ['구분', null],
            rules: ['관련 원칙', null], issue: ['이슈', null], link: ['원문 URL', null] },
   appr:  { t: ['제목', 'title'], no: ['기안번호', 'text'], st: ['진행상태', 'text'], steps: ['결재 단계', 'text'], amt: ['총액', 'text'],
-           files: ['첨부', 'text'], detail: ['문서 내용', 'text'] },
+           files: ['첨부', 'text'], detail: ['문서 내용', 'text'],
+           who: ['구분', 'select'], drafter: ['기안자', 'text'], label: ['라벨', 'text'], use: ['출납부 후보', 'check'] },
   cash:  { t: ['내역', 'title'], key: ['묶음키', 'text'], sum: ['금액', 'num'], n: ['줄 수', 'num'], from: ['시작일', 'date'], to: ['종료일', 'date'],
            vendors: ['거래처', 'text'], rows: ['출납부 행', 'text'] },
   pay:   { m: ['월', 'title'], d: ['지급일', 'date'], g: ['지급총액', 'num'], ded: ['공제총액', 'num'], net: ['실수령액', 'num'],

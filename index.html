@@ -2129,7 +2129,7 @@ function apprCard(){
   const rows=A&&A.rows?A.rows.slice().sort((a,b)=>{const o={red:0,orange:1,blue:2,"":3,green:4};return o[apprState(a).c]-o[apprState(b).c]}):[];
   const tabRows=rows.filter(r=>S.apprTab==="others"?r.mine===false:r.mine!==false),done=tabRows.filter(r=>apprState(r).c==="green").length;
   const visible=tabRows.filter(r=>{const c=apprState(r).c;return S.apprFilter==="all"||S.apprFilter==="done"?S.apprFilter==="all"||c==="green":S.apprFilter==="red"?c==="red":c!=="red"&&(c!=="green"||S.apprDone)});
-  const saveUse=()=>{ls.set("desk:apprUse",S.apprUse);render()};
+  const saveUse=()=>{ls.set("desk:apprUse",S.apprUse);if(S.appr){S.appr.at=new Date().toISOString();ls.set("desk:appr",S.appr)}render();syncNow("appr")}; // 체크도 노션 「출납부 후보」에 반영
   const md=d=>d?+d.slice(5,7)+"/"+ +d.slice(8,10):"";
   const preparedPill=e=>{
     const matches=expApprovalMatches(e,rows);
@@ -2408,8 +2408,8 @@ const stepsTxt=s=>(s||[]).map(x=>x.d?x.r+" "+x.d:x.r).join(" → ");
 const stepsOf=t=>String(t||"").split(" → ").filter(Boolean).map(x=>{const m=x.match(/^(.+) (\d{4}\/\d{2}\/\d{2})$/);return m?{r:m[1],d:m[2]}:{r:x,d:""}});
 const SYNC={
   appr:{rows:"apprRows",id:"no",ls:"desk:appr",local:()=>S.appr,list:A=>A.rows,meta:A=>({at:A.at,v:A.v}),
-    out:r=>({t:r.title,no:r.no,st:r.st,steps:stepsTxt(r.steps),amt:String(r.amt||""),files:(r.files||[]).join("\n"),detail:r.detail||""}),
-    back:(x,m)=>{const old=new Map(((S.appr&&S.appr.rows)||[]).map(r=>[r.no,r]));S.appr={hamkkun:"appr",v:m.v,at:m.at,rows:x.map(r=>({no:r.no,title:r.t,st:r.st||"",steps:stepsOf(r.steps),amt:r.amt||"",files:r.files?r.files.split("\n"):[],detail:r.detail||"",mine:old.get(r.no)?.mine!==false,drafter:old.get(r.no)?.drafter||"",label:old.get(r.no)?.label||""}))}}},
+    out:r=>({t:r.title,no:r.no,st:r.st,steps:stepsTxt(r.steps),amt:String(r.amt||""),files:(r.files||[]).join("\n"),detail:r.detail||"",who:r.mine===false?"모두의공모":"내 결재",drafter:r.drafter||"",label:r.label||"",use:r.mine===false&&S.apprUse.includes(r.no)}),
+    back:(x,m)=>{const old=new Map(((S.appr&&S.appr.rows)||[]).map(r=>[r.no,r]));S.appr={hamkkun:"appr",v:m.v,at:m.at,rows:x.map(r=>({no:r.no,title:r.t,st:r.st||"",steps:stepsOf(r.steps),amt:r.amt||"",files:r.files?r.files.split("\n"):[],detail:r.detail||"",mine:r.who?r.who!=="모두의공모":old.get(r.no)?.mine!==false,drafter:r.drafter||old.get(r.no)?.drafter||"",label:r.label||old.get(r.no)?.label||""}))};if(x.some(r=>r.who)){S.apprUse=x.filter(r=>r.use&&r.who==="모두의공모").map(r=>r.no);ls.set("desk:apprUse",S.apprUse)}}},
   cash:{rows:"cashRows",id:"key",ls:"desk:cash",local:()=>S.cash,list:C=>C.groups,meta:C=>({at:C.at,file:C.file,total:C.total,blank:C.blank}),
     out:x=>({t:x.memo,key:x.key,sum:x.sum,n:x.n,from:x.from,to:x.to,vendors:x.vendors.join("\n"),rows:x.rows.join(",")}),
     back:(x,m)=>{S.cash=Object.assign({},m,{groups:x.map(r=>({key:r.key,memo:r.t,sum:r.sum,n:r.n,from:r.from,to:r.to,vendors:r.vendors?r.vendors.split("\n"):[],rows:r.rows?r.rows.split(",").map(Number):[]})).sort((a,b)=>b.to.localeCompare(a.to))})}},
