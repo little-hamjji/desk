@@ -2124,7 +2124,7 @@ function apprState(r){
 function apprCard(){
   const A=S.appr,ups=Object.values(S.exps).filter(e=>e.up||e.multi);
   const paste=async()=>{let t="";try{t=await navigator.clipboard.readText()}catch(e){}if(!/"hamkkun":"appr"/.test(t))t=prompt("이카운트에서 복사한 결재현황을 붙여넣어 주세요 (Ctrl+V)")||"";
-    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);const removed=expDedupeBundles();ls.set("desk:exps",S.exps);toast(d.rows.length+"건을 불러왔습니다"+(removed?" · 중복 지결 묶음 "+removed+"개 정리":""));render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
+    try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;/* 합치기: 같은 기안번호만 새 내용으로, 나머지는 유지(11/5 대표님: 모두의공모·내 결재 따로 불러와도 안 사라지게) */const got=d.rows.length,mp=new Map(((S.appr&&S.appr.rows)||[]).map(r=>[r.no,r]));d.rows.forEach(r=>mp.set(r.no,r));d.rows=[...mp.values()];S.appr=d;ls.set("desk:appr",d);const removed=expDedupeBundles();ls.set("desk:exps",S.exps);toast(got+"건을 불러왔습니다 · 전체 "+d.rows.length+"건"+(removed?" · 중복 지결 묶음 "+removed+"개 정리":""));render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
   const rows=A&&A.rows?A.rows.slice().sort((a,b)=>{const o={red:0,orange:1,blue:2,"":3,green:4};return o[apprState(a).c]-o[apprState(b).c]}):[];
   const tabRows=rows.filter(r=>S.apprTab==="others"?r.mine===false:r.mine!==false),done=tabRows.filter(r=>apprState(r).c==="green").length;
