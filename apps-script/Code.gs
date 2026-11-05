@@ -13,6 +13,7 @@
  */
 
 const DB = {
+  gong:  '0b31df1ebf6f43e9b33e56ac9988f1de', // 공문 대장
   tasks: 'c7014489707248d889238a4165a4dc8d', // 할 일
   att:   'b0794766c61842caa2c6513d5cd7b6bf', // 근태·야근 기록
   month: 'f2cbbc4c34b944988b6de91a047f1c18', // 월별 야근·수당
@@ -170,6 +171,7 @@ function chunks(s) { const a = []; for (let i = 0; i < s.length; i += 1900) a.pu
 
 // 대시보드 필드 이름 ↔ 노션 속성 이름
 const MAP = {
+  gong: { t: ['제목', 'title'], k: ['키', 'text'], no: ['시행번호', 'text'], d: ['시행일', 'date'], to: ['수신', 'text'], att: ['붙임', 'text'], files: ['파일', 'text'], warn: ['확인', 'text'], link: ['링크', 'url'], at: ['수정일', 'date'], st: ['상태', 'select'] },
   tasks: { t: ['업무내용', 'title'], s: ['상태', 'status'], d: ['날짜', 'date'], p: ['프로젝트', 'select'], y: ['업무 유형', 'select'],
            r: ['우선순위', 'select'], c: ['분류', 'select'], star: ['⭐ 포트폴리오', 'check'], detail: ['세부 업무', 'text'], note: ['비고', 'text'], out: ['성과·산출물', 'text'] },
   habit: { n: ['습관', 'title'], i: ['아이콘', 'text'], o: ['순서', 'num'], on: ['사용', 'check'], g: ['주간 목표', 'num'], dates: ['체크 날짜', 'text'] },
@@ -452,7 +454,7 @@ function scanList() {
 
 function loadNotion(today) {
     const since = addDays(today, -60);
-    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news, apprs, cashes, banks, jpLogs, jpSorries, docs, staffRows, pays] = queryMany([
+    const [tasks, att, months, leave, habits, memos, jobs, logs, sorries, news, apprs, cashes, banks, jpLogs, jpSorries, docs, staffRows, pays, gongs] = queryMany([
       { db: DB.tasks, body: { filter: { or: [
         { property: '상태', status: { does_not_equal: '완료' } },
         { property: '날짜', date: { on_or_after: since } },
@@ -475,9 +477,11 @@ function loadNotion(today) {
       { db: DB.doc, max: 300, opt: '지원 서류' },
       { db: DB.staff, opt: '직원 상태' },
       { db: DB.pay, opt: '급여 현황' },
+      { db: DB.gong, body: { sorts: [{ property: '수정일', direction: 'descending' }] }, max: 300, opt: '공문 대장' },
     ]);
     const okDb = n => !WARN.some(w => w.indexOf(n) === 0); // 못 읽은 표는 빈 표로 보내지 않음
     return {
+      gongRows: okDb('공문 대장') ? gongs.slice(0, 300).map(p => read('gong', p)) : undefined,
       apprRows: okDb('이카운트 결재현황') ? apprs.map(p => read('appr', p)) : undefined,
       cashRows: okDb('출납부 미작성 지결') ? cashes.map(p => read('cash', p)) : undefined,
       bankRows: okDb('통장 검수') ? banks.map(p => read('bank', p)) : undefined,
@@ -501,7 +505,101 @@ function loadNotion(today) {
     };
 }
 
+// HWPX의 문단 텍스트만 읽음. 표 안 문단도 순서를 유지한다.
+function gongText(blob) {
+  const section = Utilities.unzip(blob.setContentType('application/zip')).find(f => f.getName() === 'Contents/section0.xml');
+  if (!section) throw new Error('HWPX section0.xml 없음');
+  const root = XmlService.parse(section.getDataAsString('UTF-8')).getRootElement(), lines = [];
+  function walk(el, paragraph) {
+    if (el.getName() === 'p') {
+      const line = []; lines.push(line);
+      el.getChildren().forEach(c => walk(c, line));
+    } else if (el.getName() === 't' && paragraph) paragraph.push(el.getText());
+    else el.getChildren().forEach(c => walk(c, paragraph));
+  }
+  walk(root, null);
+  return lines.map(x => x.join('')).join('\n');
+}
+function gongFields(folder, files, at) {
+  const name = folder.getName(), m = name.match(/(\d{4})-(\d{3})/);
+  const f = { t: name.replace(/^창업육성팀\s+\d{4}-\d{3}\s*/, ''), k: folder.getId(), no: m ? m[0] : '', d: null, to: '', att: '', files: files.map(x => x.getName()).sort().join('\n'), link: folder.getUrl(), at };
+  const hwpx = files.filter(x => /\.hwpx$/i.test(x.getName())).sort((a,b) => a.getName().localeCompare(b.getName()));
+  const main = hwpx.find(x => /\[(공문|내부기안)\]/.test(x.getName())) || hwpx[0], warnings = [];
+  if (main) {
+    const text = gongText(main.getBlob()), lines = text.split('\n').map(x => x.trim());
+    lines.forEach(line => {
+      let v = line.match(/^수\s*신\s*[:：]?\s*(.+)/); if (v) f.to = v[1];
+      v = line.match(/^제\s*목\s*[:：]?\s*(.+)/); if (v) f.t = v[1];
+    });
+    const issue = text.match(/시행\s*창업육성팀\s*(\d{4}-\d{3})\s*\(\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s*\)/);
+    if (issue) {
+      f.no = issue[1];
+      const y = +issue[2], mo = +issue[3], d = +issue[4], date = new Date(Date.UTC(y, mo - 1, d));
+      if (date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d) f.d = [issue[2], String(mo).padStart(2,'0'), String(d).padStart(2,'0')].join('-');
+    }
+    const attachments = []; let taking = false;
+    lines.map(x => x.trim()).forEach(line => {
+      if (/^붙임/.test(line)) { taking = true; attachments.push(line.replace(/^붙임\s*[:：]?\s*/, '').replace(/끝\./g, '').trim()); }
+      else if (taking && /^\d+\./.test(line)) attachments.push(line.replace(/끝\./g, '').trim());
+      else if (line) taking = false;
+    });
+    f.att = attachments.filter(Boolean).join('\n');
+    if (/:\s{2,}[^\d\n]*원/.test(text) || /금\s+원/.test(text)) warnings.push('금액 빈칸');
+  } else {
+    warnings.push('hwpx 없음');
+    if (files.some(x => /\.hwp$/i.test(x.getName()))) warnings.push('hwp(내용 미확인)');
+  }
+  if (!f.no || /-000$/.test(f.no)) warnings.unshift('시행번호 미정');
+  if (!f.d) warnings.push('시행일 미정');
+  f.warn = warnings.join(' · ');
+  return f;
+}
+function gongScan({ cursor } = {}) {
+  if (!hasNotion()) throw new Error('개인 서버에서 실행해 주세요');
+  const lock = LockService.getScriptLock(); lock.waitLock(8000);
+  try {
+    const started = Date.now(), dirs = DriveApp.getFolderById('1RVQtrosWq3lQ4M4ymGBJoSo6KbybyZku').getFoldersByName('공문');
+    if (!dirs.hasNext()) throw new Error('공문 폴더를 찾을 수 없습니다');
+    const parent = dirs.next();
+    if (dirs.hasNext()) throw new Error('공문 폴더가 여러 개입니다');
+    const folders = [], it = parent.getFolders();
+    while (it.hasNext()) folders.push(it.next());
+    const [pages] = queryMany([{ db: DB.gong, max: 10000 }]), rows = pages.map(p => read('gong', p)), have = new Map(rows.map(r => [r.k, r]));
+    const present = new Set(folders.map(f => f.getId()));
+    const work = folders.map(folder => ({ key: 'f:' + folder.getId(), folder })).concat(rows.filter(r => r.k && !present.has(r.k)).map(row => ({ key: 'r:' + row.id, row }))).sort((a,b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+    let scanned = 0, added = 0, updated = 0, last = cursor || '';
+    const todo = work.filter(x => x.key > last);
+    for (const item of todo) {
+      if (scanned >= 40 || Date.now() - started > 240000) break;
+      if (item.folder) {
+        const folder = item.folder, files = [], fi = folder.getFiles(); let at = folder.getLastUpdated().getTime();
+        while (fi.hasNext()) { const file = fi.next(); files.push(file); at = Math.max(at, file.getLastUpdated().getTime()); }
+        at = new Date(at).toISOString();
+        const old = have.get(folder.getId()), names = files.map(f => f.getName()).sort().join('\n');
+        if (!old || Date.parse(old.at) !== Date.parse(at) || old.files !== names || (old.warn || '').includes('드라이브에 없음')) {
+          const fields = gongFields(folder, files, at);
+          if (old) { notion('pages/' + old.id, 'patch', { properties: props('gong', fields) }); updated++; }
+          else {
+            fields.st = /시행번호 미정|금액 빈칸/.test(fields.warn) ? '작성 중' : '시행 완료';
+            notion('pages', 'post', { parent: { database_id: DB.gong }, properties: props('gong', fields) }); added++;
+          }
+        }
+      } else if (!(item.row.warn || '').includes('드라이브에 없음')) {
+        notion('pages/' + item.row.id, 'patch', { properties: props('gong', { warn: [item.row.warn, '드라이브에 없음'].filter(Boolean).join(' · ') }) }); updated++;
+      }
+      scanned++; last = item.key;
+    }
+    const more = todo.length > scanned, at = new Date().toISOString();
+    if (!more) {
+      const P = PropertiesService.getScriptProperties(), meta = JSON.parse(P.getProperty('syncMeta') || '{}');
+      meta.gong = { at }; P.setProperty('syncMeta', JSON.stringify(meta));
+    }
+    return { ok: true, scanned, added, updated, more, at, cursor: more ? last : null };
+  } finally { lock.releaseLock(); }
+}
+
 Object.assign(ACTIONS, {
+  gongScan,
   // 공통: 추가·수정·휴지통
   add({ kind, fields }) {
     if (!DB[kind] || kind === 'month' || kind === 'leave') throw new Error('추가할 수 없는 종류입니다');
@@ -511,6 +609,9 @@ Object.assign(ACTIONS, {
   },
   update({ kind, id, fields }) {
     if (!MAP[kind]) throw new Error('알 수 없는 종류입니다');
+    if (kind === 'gong') {
+      if (!fields || !['작성 중', '결재 중', '시행 완료'].includes(fields.st) || Object.keys(fields).some(k => k !== 'st')) throw new Error('공문은 상태만 변경할 수 있습니다');
+    }
     if (kind === 'att') fields = linkAttendance(fields);
     const page = notion('pages/' + id, 'patch', { properties: props(kind, fields) });
     return read(kind, page);
@@ -523,7 +624,7 @@ Object.assign(ACTIONS, {
 
   // 결재현황·출납부를 언제 불러왔는지 기록(줄을 다 올린 뒤 마지막에)
   syncMark({ kind, meta }) {
-    if (!['appr', 'cash', 'bank'].includes(kind)) throw new Error('알 수 없는 종류입니다');
+    if (!['appr', 'cash', 'bank', 'gong'].includes(kind)) throw new Error('알 수 없는 종류입니다');
     const lock = LockService.getScriptLock(); lock.waitLock(8000);
     try {
       const P = PropertiesService.getScriptProperties(), all = JSON.parse(P.getProperty('syncMeta') || '{}');

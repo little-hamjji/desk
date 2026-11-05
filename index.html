@@ -1767,7 +1767,7 @@ function pjBody(list){
 function viewAcct(){
   const y=ACCT_Y[S.af]||ACCT_Y.all;
   return [h("div",{class:"row"},h("div",{class:"seg",role:"group","aria-label":"구분"},[["all","전체"],["acct","회계"],["admin","행정·공문"]].map(([k,n])=>h("button",{"aria-pressed":String(S.af===k),onclick:()=>{S.af=k;ls.set("desk:af",k);render()}},n)))),
-    ...(([kp,lists])=>[kp,h("div",{class:"grid g2"},apprCard(),h("div",{class:"stack"},cashCard(),scanCard())),bankCard(),lists])(pjBody(allTasks().filter(t=>y.includes(t.y))))]; // 남은 일·완료 기록은 맨 뒤(11/5 대표님)
+    ...(([kp,lists])=>[kp,h("div",{class:"grid g2"},apprCard(),h("div",{class:"stack"},cashCard(),scanCard())),bankCard(),gongCard(),lists])(pjBody(allTasks().filter(t=>y.includes(t.y))))]; // 남은 일·완료 기록은 맨 뒤(11/5 대표님)
 }
 function viewLetter(){return pjBody(allTasks().filter(t=>t.p==="모두의 레터"))}
 function tmParse(v){v=String(v).trim().replace(/분|min/g,"");let m=v.match(/^(\d{1,3}):(\d{1,2})$/);if(m)return (+m[1]*60+ +m[2])||null;m=v.match(/^(\d{1,3})$/);return m&&+m[1]>0?+m[1]*60:null}
@@ -2382,6 +2382,51 @@ function bankRow(r,B){
       r.ap?h("div",null,h("b",null,`지결 ${r.ap.no} `),`${r.ap.title} · ${r.ap.st}${r.ap.amt?" · "+r.ap.amt:""}`):null,
       bulk?h("div",null,h("b",null,`대량이체 ${r.d} ${bulk.length}명 `),bulk.slice(0,120).map(x=>`${x.who} ${x.amt.toLocaleString()}`).join(", ")):null,
       h("button",{class:"btn sm ghost",disabled:bankHas(r.k)?"disabled":null,onclick:()=>bankAdd(r)},bankHas(r.k)?"할 일에 있음":"할 일로")):null);
+}
+const GONG_ST=["작성 중","결재 중","시행 완료"];
+const GONG={f:ls.get("desk:gongF","전체"),q:"",n:30,busy:false,progress:"",saving:new Set()};
+async function gongScanNow(){
+  if(S.demo||!S.cfg)return toast("예시 모드에서는 스캔할 수 없습니다","bad");
+  if(GONG.busy)return;
+  GONG.busy=true;GONG.progress="드라이브 읽는 중";render();
+  let cursor=null,scanned=0,added=0,updated=0;
+  try{
+    let r;
+    do{
+      r=await api("gongScan",{cursor});if(!r||!r.ok)throw new Error("스캔 응답을 확인할 수 없습니다");
+      scanned+=r.scanned;added+=r.added;updated+=r.updated;
+      GONG.progress=`${scanned}건 확인 · ${added}건 추가 · ${updated}건 수정`;render();
+      if(r.more&&(!r.cursor||r.cursor===cursor))throw new Error("스캔 이어받기 정보가 없습니다");
+      cursor=r.cursor;
+    }while(r.more);
+    toast(GONG.progress);await refresh(true);
+  }catch(e){toast("공문 스캔 실패 · "+e.message,"bad")}
+  finally{GONG.busy=false;GONG.progress="";render()}
+}
+async function gongSet(id){
+  if(S.demo||!S.cfg)return toast("예시 모드에서는 상태를 변경할 수 없습니다","bad");
+  if(GONG.saving.has(id))return;
+  const row=(S.data.gongRows||[]).find(x=>x.id===id);if(!row)return;
+  const st=GONG_ST[(GONG_ST.indexOf(row.st)+1)%GONG_ST.length];GONG.saving.add(id);
+  try{await mutate(D=>{D.gongRows.find(x=>x.id===id).st=st},()=>api("update",{kind:"gong",id,fields:{st}}))}
+  finally{GONG.saving.delete(id);render()}
+}
+function gongCard(){
+  const rows=S.data.gongRows,U=GONG,at=(S.data.syncMeta||{}).gong;
+  const show=(rows||[]).filter(r=>(U.f==="전체"||r.st===U.f)&&[r.t,r.to,r.no].join(" ").toLowerCase().includes(U.q.toLowerCase())).sort((a,b)=>(b.at||"").localeCompare(a.at||""));
+  return card("공문 대장",{count:rows?rows.length+"건":null,right:h("button",{class:"btn sm",disabled:U.busy||S.demo||!rows,onclick:gongScanNow},U.busy?"스캔 중…":"드라이브에서 새로 고침")},
+    !rows?h("div",{class:"empty"},"서버 재배포 후 사용할 수 있습니다"):h("div",{class:"stack"},
+      h("div",{class:"faint"},U.busy?U.progress:at&&at.at?"마지막 스캔 · "+new Date(at.at).toLocaleString("ko-KR"):"아직 스캔하지 않았습니다"),
+      h("div",{class:"seg",role:"group","aria-label":"공문 상태"},["전체",...GONG_ST].map(st=>h("button",{"aria-pressed":String(U.f===st),onclick:()=>{U.f=st;U.n=30;ls.set("desk:gongF",st);render()}},st))),
+      h("input",{class:"in",id:"gong-search",placeholder:"제목·수신·시행번호 검색","aria-label":"공문 검색",value:U.q,oninput:e=>{U.q=e.target.value;U.n=30;const pos=e.target.selectionStart;render();const input=$("#gong-search");if(input){input.focus();input.setSelectionRange(pos,pos)}}}),
+      show.length?h("div",{class:"list"},show.slice(0,U.n).map(r=>h("div",{class:"stack"},
+        h("div",{class:"row",style:"flex-wrap:wrap"},h("span",{class:r.no?"num":"faint"},r.no||"번호 미정"),h("b",{class:"tt"},r.t),
+          h("button",{class:"btn sm",disabled:S.demo||GONG.saving.has(r.id),onclick:()=>gongSet(r.id),title:"누르면 다음 상태로 변경"},r.st||"상태 미정")),
+        h("div",{class:"faint"},"수신 · "+(r.to||"미정")+" · 시행일 · "+(dOf(r.d)||"미정")),
+        r.warn?h("div",{class:"bk-cs"},r.warn.split(" · ").map(w=>h("span",{class:"bk-c o"},w))):null,
+        r.att?h("details",null,h("summary",null,"붙임 펼치기"),h("div",{style:"white-space:pre-wrap"},r.att)):null,
+        /^https:\/\/drive\.google\.com\//.test(r.link||"")?h("a",{class:"btn sm ghost",href:r.link,target:"_blank",rel:"noopener"},"폴더 열기"):null))):h("div",{class:"empty"},"해당하는 공문이 없습니다"),
+      show.length>U.n?h("button",{class:"btn ghost",onclick:()=>{U.n+=30;render()}},"더 보기"):null));
 }
 function bankCard(){
   const B=S.bank,U=S.bankUI,pick=e=>{const f=[...e.currentTarget.files];e.currentTarget.value="";if(f.length)bankRead(f)},md=d=>fmtMD(d);
