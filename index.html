@@ -2084,15 +2084,16 @@ function hkStatus(){(async()=>{
     b.textContent="🐹 햄꾼 · "+m;clearTimeout(window.__hkT);if(!keep)window.__hkT=setTimeout(()=>b.remove(),9000)};
   const all=[...document.querySelectorAll("tbody tr")].filter(tr=>tr.offsetParent&&/\d{4}\/\d{2}\/\d{2}-\d+/.test(tr.innerText));
   if(!all.length){say("결재 목록이 보이지 않습니다. 「내결재관리 → 진행중」에서 눌러 주세요.");return}
-  const mine=all.filter(tr=>[...tr.querySelectorAll("td")].some(td=>td.innerText.trim()===ME));
   let skipped=0,failed=0,firstError="";
-  const rows=(mine.length?mine:all).filter(tr=>{if([...tr.querySelectorAll("td")].some(td=>td.innerText.trim()==="기안중")){skipped++;return false}return true}).slice(0,MAX),out=[];
+  const rows=all.filter(tr=>{if([...tr.querySelectorAll("td")].some(td=>td.innerText.trim()==="기안중")){skipped++;return false}return true}).slice(0,MAX),out=[];
   for(let i=0;i<rows.length;i++){try{const tr=rows[i];say(`결재 단계 확인 중… ${i+1}/${rows.length}\n(결재가 끝난 문서는 다음부터 열지 않아 빨라집니다)`,1);
     const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
-    const big=[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);big.querySelectorAll(".label").forEach(x=>x.remove());
+    const col=name=>{for(const head of tr.closest("table").querySelectorAll("thead tr")){const cell=[...head.cells].find(td=>td.innerText.trim()===name);if(cell)return cell.cellIndex}return -1};
+    const cells=[...tr.querySelectorAll("td")],di=col("기안자"),ti=col("제목"),drafter=di>=0?(c[di]||""):(c.includes(ME)?ME:""),mine=di>=0?drafter===ME:c.includes(ME);
+    const big=ti>=0?cells[ti].cloneNode(true):[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);const label=[...big.querySelectorAll(".label")].map(x=>x.innerText.trim()).filter(Boolean).join(" ");big.querySelectorAll(".label").forEach(x=>x.remove());
     const title=big.innerText.trim().replace(/\s+/g," "),st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();
     const steps=[],a=[...tr.querySelectorAll("a")].find(x=>x.innerText.trim()==="보기");let detail="",files=[],amt="";
-    const hit=readHit(cache[no]);if(hit&&hit.steps&&hit.steps.length&&hit.steps.every(x=>x.d)){out.push(Object.assign({},hit,{no,title,st}));continue}
+    const hit=readHit(cache[no]);if(hit&&hit.steps&&hit.steps.length&&hit.steps.every(x=>x.d)){out.push(Object.assign({},hit,{no,title,st,mine,drafter,label}));continue}
     if(a){a.click();let boxes=[];for(let k=0;k<24&&!boxes.length;k++){await sleep(250);boxes=[...document.querySelectorAll("table")].filter(t=>t.offsetParent&&/^결\s*재/.test(t.innerText.trim())&&t.innerText.length<300)}
       boxes.forEach(t=>{const trs=[...t.querySelectorAll("tr")];if(trs.length<3)return;const roles=[...trs[0].children].slice(1).map(x=>x.innerText.trim().replace(/\s+/g,""));const ds=[...trs[trs.length-1].children].map(x=>x.innerText.trim());
         roles.forEach((r,j)=>{const m=(ds[j]||"").match(/\d{4}\/\d{2}\/\d{2}/),d=m?m[0]:"",p=steps[steps.length-1];if(p&&p.r===r){if(!p.d)p.d=d}else steps.push({r,d})})});
@@ -2101,14 +2102,17 @@ function hkStatus(){(async()=>{
         const i=tx.indexOf("기안번호"),j=tx.search(/\n(검토완료|첨언|반려문서보기)\n/);tx=tx.slice(Math.max(0,i),j>i?j:i+4000).slice(0,4000);
         detail=tx;files=[...new Set((tx.match(/[^\n]+\.(pdf|xlsx?|hwpx?|docx?|zip|jpe?g|png)/gi)||[]).map(s=>s.trim()))].slice(0,12);amt=((tx.match(/총합계\s*([\d,]+)/)||[])[1]||"")}
       await close()}
-    out.push({no,title,st,steps,amt,files,detail});if(steps.length&&steps.every(x=>x.d)){cache[no]={steps,amt,files,detail};try{localStorage.setItem("hkApprCache",stringify(cache))}catch(e){}}
+    out.push({no,title,st,steps,amt,files,detail,mine,drafter,label});if(steps.length&&steps.every(x=>x.d)){cache[no]={steps,amt,files,detail};try{localStorage.setItem("hkApprCache",stringify(cache))}catch(e){}}
     }catch(e){failed++;if(failed===1)firstError=e&&e.message?e.message:String(e);try{await close()}catch(closeError){}}}
   const txt=stringify({hamkkun:"appr",v:2,at:new Date().toISOString(),rows:out}),errors=failed?" (오류로 "+failed+"건 건너뜀: "+firstError+")":"";
-  try{await navigator.clipboard.writeText(txt);say(out.length+"건의 결재 단계를 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요."+(skipped?" (기안중 "+skipped+"건은 건너뜀)":"")+errors)}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요"+errors,txt)}
+  const counts="내 기안 "+out.filter(r=>r.mine).length+"건 · 다른 사람 "+out.filter(r=>!r.mine).length+"건";
+  try{await navigator.clipboard.writeText(txt);say(counts+"\n"+out.length+"건의 결재 단계를 복사했습니다 ✓\n햄찌스 데스크 → 도구 → 「결재현황 붙여넣기」를 눌러 주세요."+(skipped?" (기안중 "+skipped+"건은 건너뜀)":"")+errors)}catch(e){prompt("아래 내용을 복사(Ctrl+C)해서 대시보드에 붙여넣어 주세요\n"+counts+(skipped?" (기안중 "+skipped+"건은 건너뜀)":"")+errors,txt)}
 })()}
 const bmk=fn=>"javascript:"+encodeURIComponent("("+fn.toString()+")()");
-const apprFix=d=>{if(d&&typeof d.rows==="string"){try{d.rows=JSON.parse(d.rows)}catch(e){d.rows=[]}}if(d&&!Array.isArray(d.rows))d.rows=[];return d};
+const apprFix=d=>{if(d&&typeof d.rows==="string"){try{d.rows=JSON.parse(d.rows)}catch(e){d.rows=[]}}if(d&&!Array.isArray(d.rows))d.rows=[];if(d)d.rows.forEach(r=>{if(r.mine===undefined)r.mine=true});return d};
 S.appr=apprFix(ls.get("desk:appr",null));S.apprPop=null;
+S.apprUse=ls.get("desk:apprUse",[]);S.apprTab="mine";S.apprFilter="progress";S.apprDone=false;
+const apprTitle=t=>String(t||"").replace(/^\[모두의공모\]\s*/,"").replace(/^모두의공모\s+/,"").replace(/ (지급 결과의 건|지출 결과의 건|결과의 건|의 건|건)$/,"").trim();
 // 결재 단계로 지금 상태 판단: 반려 / 결재 완료 / ○○ 대기(3일 넘게 멈추면 확인 필요)
 function apprState(r){
   if(r.st==="반려")return {t:"반려",c:"red"};
@@ -2123,6 +2127,9 @@ function apprCard(){
     try{const d=apprFix(JSON.parse(t));if(d.hamkkun!=="appr")throw 0;S.appr=d;ls.set("desk:appr",d);const removed=expDedupeBundles();ls.set("desk:exps",S.exps);toast(d.rows.length+"건을 불러왔습니다"+(removed?" · 중복 지결 묶음 "+removed+"개 정리":""));render();syncNow("appr")}catch(e){toast("결재현황을 읽지 못했습니다. 이카운트에서 「햄꾼 결재현황」을 다시 눌러 주세요","bad")}};
   const noClick=ev=>{ev.preventDefault();toast("클릭이 아니라 즐겨찾기 막대로 끌어다 놓아 주세요")};
   const rows=A&&A.rows?A.rows.slice().sort((a,b)=>{const o={red:0,orange:1,blue:2,"":3,green:4};return o[apprState(a).c]-o[apprState(b).c]}):[];
+  const tabRows=rows.filter(r=>S.apprTab==="others"?r.mine===false:r.mine!==false),done=tabRows.filter(r=>apprState(r).c==="green").length;
+  const visible=tabRows.filter(r=>{const c=apprState(r).c;return S.apprFilter==="all"||S.apprFilter==="done"?S.apprFilter==="all"||c==="green":S.apprFilter==="red"?c==="red":c!=="red"&&(c!=="green"||S.apprDone)});
+  const saveUse=()=>{ls.set("desk:apprUse",S.apprUse);render()};
   const md=d=>d?+d.slice(5,7)+"/"+ +d.slice(8,10):"";
   const preparedPill=e=>{
     const matches=expApprovalMatches(e,rows);
@@ -2140,12 +2147,17 @@ function apprCard(){
     ups.length?h("div",{class:"appr"},ups.map(e=>h("button",{class:"appr-r",onclick:()=>{S.sel={kind:"exp",key:e.key};render()}},
       h("div",{class:"appr-h"},h("span",{class:"tt"},e.multi?"지결 묶음 · "+e.rows.length+"건":e.vendor||e.fname),h("span",{class:"pill"},(e.multi?expSum(e):(+(String(e.amt).replace(/[^0-9]/g,""))||0)).toLocaleString()+"원"),preparedPill(e))))):null,
     A&&!(A.v>=2)?h("div",{class:"banner"},"이 결재현황은 예전 버튼으로 가져와서 결재 단계가 없습니다. 즐겨찾기의 「🐹 햄꾼 결재현황」을 지우고 위 파란 버튼을 다시 끌어다 놓은 뒤, 이카운트 「내결재관리 → 진행중」에서 다시 눌러 주세요."):null,
-    rows.length?h("div",{class:"appr"},(S.apprAll?rows:rows.slice(0,20)).map(r=>{const s=apprState(r);
-      return h("button",{class:"appr-r",onclick:()=>{S.apprPop=r.no;render()}},
-        h("div",{class:"appr-h"},h("span",{class:"tt"},r.title),h("span",{class:"pill "+s.c},s.t)),
+    h("div",{class:"row"},[["mine","내 결재",rows.filter(r=>r.mine!==false).length],["others","모두의공모",rows.filter(r=>r.mine===false).length]].map(([key,t,n])=>h("button",{class:"btn sm "+(S.apprTab===key?"pri":""),onclick:()=>{S.apprTab=key;S.apprAll=false;S.apprDone=false;render()}},t+" "+n))),
+    S.apprTab==="others"?h("div",null,h("button",{class:"btn ghost sm",onclick:()=>{const all=tabRows.every(r=>S.apprUse.includes(r.no)),nos=new Set(tabRows.map(r=>r.no));S.apprUse=S.apprUse.filter(no=>!nos.has(no));if(!all)S.apprUse.push(...nos);saveUse()}},"전체 선택/해제"),h("div",{class:"faint",style:"font-size:12px"},"체크한 "+tabRows.filter(r=>S.apprUse.includes(r.no)).length+"건을 출납부 번호 후보로 사용")):null,
+    h("div",{class:"chips"},[["all","전체"],["progress","진행 중"],["red","반려"],["done","완료"]].map(([key,t])=>h("button",{class:"chip","aria-pressed":String(S.apprFilter===key),onclick:()=>{S.apprFilter=key;S.apprAll=false;S.apprDone=false;render()}},t))),
+    S.apprFilter==="progress"&&done?h("button",{class:"btn ghost sm",onclick:()=>{S.apprDone=!S.apprDone;render()}},S.apprDone?"완료 접기":"완료 "+done+"건 보기"):null,
+    visible.length?h("div",{class:"appr"},(S.apprAll?visible:visible.slice(0,20)).map(r=>{const s=apprState(r);
+      return h("div",{class:"appr-r",role:"button",tabindex:0,onclick:()=>{S.apprPop=r.no;render()},onkeydown:ev=>{if(ev.target===ev.currentTarget&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();S.apprPop=r.no;render()}}},
+        h("div",{class:"appr-h"},S.apprTab==="others"?h("input",{type:"checkbox",checked:S.apprUse.includes(r.no),"aria-label":"출납부 번호 후보로 사용: "+r.no,onclick:ev=>ev.stopPropagation(),onkeydown:ev=>ev.stopPropagation(),onchange:ev=>{ev.stopPropagation();S.apprUse=S.apprUse.filter(no=>no!==r.no);if(ev.target.checked)S.apprUse.push(r.no);saveUse()}}):null,h("span",{class:"tt"},apprTitle(r.title)),h("span",{class:"pill "+s.c},s.t)),
+        h("small",{class:"faint"},r.drafter||""),
         r.steps&&r.steps.length?h("div",{class:"appr-steps"},r.steps.map((x,i)=>[i?h("i",null,"→"):null,h("span",{class:x.d?"ok":(r.steps.findIndex(y=>!y.d)===i?"now":"")},x.r,x.d?" ✓"+md(x.d):r.steps.findIndex(y=>!y.d)===i?" ⏳":"")])):null)})):
-      h("div",{class:"faint",style:"font-size:12px"},"아직 불러온 결재현황이 없습니다."),
-    rows.length>20?h("button",{class:"btn ghost sm",onclick:()=>{S.apprAll=!S.apprAll;render()}},S.apprAll?"접기":`나머지 ${rows.length-20}건 더 보기 (전체 ${rows.length}건)`):null);
+      h("div",{class:"faint",style:"font-size:12px"},rows.length?"해당하는 결재현황이 없습니다.":"아직 불러온 결재현황이 없습니다."),
+    visible.length>20?h("button",{class:"btn ghost sm",onclick:()=>{S.apprAll=!S.apprAll;render()}},S.apprAll?"접기":`나머지 ${visible.length-20}건 더 보기 (전체 ${visible.length}건)`):null);
 }
 // 기안을 누르면 뜨는 세부 내용 팝업
 function apprModal(){
@@ -2189,8 +2201,9 @@ const cashHas=x=>S.cashDone.has(x.key)||(S.data.tasks||[]).some(t=>(t.note||"").
 const CASH_STOP=/^(지출|지급|위한|운영|운영을|1차년도|2차년도|모두의공모|모두의|결과의|건|및|관련|비용)$/;
 const cashWords=t=>new Set(String(t).replace(/[^가-힣A-Za-z0-9]+/g," ").split(" ").filter(w=>w.length>=2&&!CASH_STOP.test(w)));
 const cashCand=x=>{const A=S.appr;if(!A||!A.rows)return null;
-  const r=A.rows.find(r=>r.amt&&+String(r.amt).replace(/[^0-9]/g,"")===x.sum);if(r)return r.no;
-  const w=cashWords(x.memo);let best=null,hit=1;A.rows.forEach(r=>{const n=[...cashWords(r.title)].filter(t=>w.has(t)).length;if(n>hit){hit=n;best=r}});return best?best.no:null};
+  const rows=A.rows.filter(r=>r.mine!==false||S.apprUse.includes(r.no));
+  const r=rows.find(r=>r.amt&&+String(r.amt).replace(/[^0-9]/g,"")===x.sum);if(r)return r.no;
+  const w=cashWords(x.memo);let best=null,hit=1;rows.forEach(r=>{const n=[...cashWords(r.title)].filter(t=>w.has(t)).length;if(n>hit){hit=n;best=r}});return best?best.no:null};
 async function cashAdd(){
   const sel=S.cash.groups.filter(x=>S.cashPick[x.key]&&!cashHas(x));if(!sel.length)return toast("추가할 묶음을 골라 주세요","bad");
   if(!S.cfg||S.demo)return toast("예시 모드에서는 추가하지 않습니다","bad");
@@ -2396,7 +2409,7 @@ const stepsOf=t=>String(t||"").split(" → ").filter(Boolean).map(x=>{const m=x.
 const SYNC={
   appr:{rows:"apprRows",id:"no",ls:"desk:appr",local:()=>S.appr,list:A=>A.rows,meta:A=>({at:A.at,v:A.v}),
     out:r=>({t:r.title,no:r.no,st:r.st,steps:stepsTxt(r.steps),amt:String(r.amt||""),files:(r.files||[]).join("\n"),detail:r.detail||""}),
-    back:(x,m)=>{S.appr={hamkkun:"appr",v:m.v,at:m.at,rows:x.map(r=>({no:r.no,title:r.t,st:r.st||"",steps:stepsOf(r.steps),amt:r.amt||"",files:r.files?r.files.split("\n"):[],detail:r.detail||""}))}}},
+    back:(x,m)=>{const old=new Map(((S.appr&&S.appr.rows)||[]).map(r=>[r.no,r]));S.appr={hamkkun:"appr",v:m.v,at:m.at,rows:x.map(r=>({no:r.no,title:r.t,st:r.st||"",steps:stepsOf(r.steps),amt:r.amt||"",files:r.files?r.files.split("\n"):[],detail:r.detail||"",mine:old.get(r.no)?.mine!==false,drafter:old.get(r.no)?.drafter||"",label:old.get(r.no)?.label||""}))}}},
   cash:{rows:"cashRows",id:"key",ls:"desk:cash",local:()=>S.cash,list:C=>C.groups,meta:C=>({at:C.at,file:C.file,total:C.total,blank:C.blank}),
     out:x=>({t:x.memo,key:x.key,sum:x.sum,n:x.n,from:x.from,to:x.to,vendors:x.vendors.join("\n"),rows:x.rows.join(",")}),
     back:(x,m)=>{S.cash=Object.assign({},m,{groups:x.map(r=>({key:r.key,memo:r.t,sum:r.sum,n:r.n,from:r.from,to:r.to,vendors:r.vendors?r.vendors.split("\n"):[],rows:r.rows?r.rows.split(",").map(Number):[]})).sort((a,b)=>b.to.localeCompare(a.to))})}},
