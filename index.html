@@ -2144,8 +2144,13 @@ function apprCard(){
       h("a",{class:"btn pri",href:bmk(hkStatus),title:"즐겨찾기 막대로 끌어다 놓기",onclick:noClick},"🐹 햄꾼 결재현황"),
       h("button",{class:"btn",onclick:paste},"결재현황 붙여넣기"),
       h("button",{class:"btn",onclick:()=>expPick()},"파일로 지결 준비")),
-    ups.length?h("div",{class:"appr"},ups.map(e=>h("button",{class:"appr-r",onclick:()=>{S.sel={kind:"exp",key:e.key};render()}},
-      h("div",{class:"appr-h"},h("span",{class:"tt"},e.multi?"지결 묶음 · "+e.rows.length+"건":e.vendor||e.fname),h("span",{class:"pill"},(e.multi?expSum(e):(+(String(e.amt).replace(/[^0-9]/g,""))||0)).toLocaleString()+"원"),preparedPill(e))))):null,
+    // 지결 묶음: 이카운트 결재내역에 같은 금액 기안이 있으면 올라간 것으로 보고 숨김(11/5 대표님)
+    ...(()=>{const won=v=>+String(v??"").replace(/[^0-9]/g,"")||0,eAmt=e=>e.multi?expSum(e):won(e.amt),
+      done=new Set(((A&&A.rows)||[]).map(r=>won(r.amt)).filter(Boolean)),shown=ups.filter(e=>!done.has(eAmt(e))),hid=ups.length-shown.length;
+      const del=(ev,e)=>{ev.stopPropagation();const b=ev.currentTarget;if(!b.dataset.arm){b.dataset.arm=1;b.textContent="한 번 더";setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent="삭제"}},3000);return}expDelete(e.key);ls.set("desk:exps",S.exps);toast("지결 묶음을 삭제했습니다");render()};
+      return [shown.length?h("div",{class:"appr"},shown.map(e=>h("div",{class:"appr-r",role:"button",tabindex:0,onclick:()=>{S.sel={kind:"exp",key:e.key};render()},onkeydown:ev=>{if(ev.target===ev.currentTarget&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();S.sel={kind:"exp",key:e.key};render()}}},
+        h("div",{class:"appr-h"},h("span",{class:"tt"},e.multi?"지결 묶음 · "+e.rows.length+"건":e.vendor||e.fname),h("span",{class:"pill"},eAmt(e).toLocaleString()+"원"),preparedPill(e),h("button",{class:"btn ghost sm",onclick:ev=>del(ev,e)},"삭제"))))):null,
+        hid?h("div",{class:"faint",style:"font-size:12px"},`이카운트 결재내역과 금액이 같은 지결 묶음 ${hid}개는 숨김`):null]})(),
     A&&!(A.v>=2)?h("div",{class:"banner"},"이 결재현황은 예전 버튼으로 가져와서 결재 단계가 없습니다. 즐겨찾기의 「🐹 햄꾼 결재현황」을 지우고 위 파란 버튼을 다시 끌어다 놓은 뒤, 이카운트 「내결재관리 → 진행중」에서 다시 눌러 주세요."):null,
     h("div",{class:"row"},[["mine","내 결재",rows.filter(r=>r.mine!==false).length],["others","모두의공모",rows.filter(r=>r.mine===false).length]].map(([key,t,n])=>h("button",{class:"btn sm "+(S.apprTab===key?"pri":""),onclick:()=>{S.apprTab=key;S.apprAll=false;S.apprDone=false;render()}},t+" "+n))),
     S.apprTab==="others"?h("div",null,h("button",{class:"btn ghost sm",onclick:()=>{const all=tabRows.every(r=>S.apprUse.includes(r.no)),nos=new Set(tabRows.map(r=>r.no));S.apprUse=S.apprUse.filter(no=>!nos.has(no));if(!all)S.apprUse.push(...nos);saveUse()}},"전체 선택/해제"),h("div",{class:"faint",style:"font-size:12px"},"체크한 "+tabRows.filter(r=>S.apprUse.includes(r.no)).length+"건을 출납부 번호 후보로 사용")):null,
