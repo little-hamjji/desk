@@ -2191,6 +2191,8 @@ async function cashRead(file){
     const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets["현금출납부(필수)"]||wb.Sheets[wb.SheetNames.find(n=>/현금출납부/.test(n))];
     if(!ws)throw new Error("「현금출납부(필수)」 시트를 찾지 못했습니다");
     const A=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    S.cashRowsAll=A.slice(4).map((r,i)=>({row:i+5,cells:Object.fromEntries(Array.from({length:11},(_,j)=>[String.fromCharCode(66+j),String(r[j+1]??"").trim()])),formulas:Object.fromEntries(Array.from({length:11},(_,j)=>{const c=String.fromCharCode(66+j);return [c,!!ws[c+(i+5)]?.f]}))}));
+    S.cashSpell=Object.fromEntries(["H","I","J"].map(c=>[c,[...new Set(S.cashRowsAll.map(r=>r.cells[c]).filter(Boolean))]]));
     const day=v=>typeof v==="number"?new Date(Date.UTC(1899,11,30)+v*864e5).toISOString().slice(0,10):String(v).trim().replace(/\./g,"-").replace(/\s/g,"");
     const rows=A.slice(4).map((r,i)=>({row:i+5,d:day(r[1]),kind:String(r[2]).trim(),amt:+r[3]||0,vendor:String(r[4]).trim(),memo:String(r[5]).trim(),no:String(r[6]).trim(),io:String(r[10]).trim()}))
       .filter(x=>x.d&&/^\d{4}-\d{2}-\d{2}/.test(x.d)&&x.amt);
@@ -2199,8 +2201,8 @@ async function cashRead(file){
       o.sum+=x.amt;o.n++;if(x.d<o.from)o.from=x.d;if(x.d>o.to)o.to=x.d;if(x.vendor&&!o.vendors.includes(x.vendor))o.vendors.push(x.vendor);o.rows.push(x.row)});
     S.cash={at:new Date().toISOString(),file:file.name,total:rows.length,blank:blank.length,groups:Object.values(g).sort((a,b)=>b.to.localeCompare(a.to))};
     S.cashBuf=buf;S.cashFile=file.name;S.cashSheet=wb.SheetNames.find(n=>wb.Sheets[n]===ws);
-    S.cashLocal={at:S.cash.at,file:S.cash.file,nos:[...new Set(A.slice(4).map(r=>String(r[6]||"").trim()).filter(Boolean))],sums:{}};
-    A.slice(4).forEach(r=>{const no=String(r[6]||"").trim();if(no)S.cashLocal.sums[no]=(S.cashLocal.sums[no]||0)+cashNum(r[3])});
+    S.cashLocal={at:S.cash.at,file:S.cash.file,nos:[...new Set(A.slice(4).map(r=>String(r[6]||"").replace(/\s/g,"")).filter(Boolean))],sums:{}}; // 출납부 번호는 "2026/10/27 -16"처럼 공백 섞임
+    A.slice(4).forEach(r=>{const no=String(r[6]||"").replace(/\s/g,"");if(no)S.cashLocal.sums[no]=(S.cashLocal.sums[no]||0)+cashNum(r[3])});
     S.cash.nos=S.cashLocal.nos;ls.set("desk:cashLocal",S.cashLocal);ls.set("desk:cash",S.cash);
     Object.keys(S.expPick).filter(k=>k.startsWith("cash:")).forEach(k=>delete S.expPick[k]);
     toast(`결의서번호 빈칸 ${blank.length}줄 → 지출 ${S.cash.groups.length}묶음`);render();syncNow("cash");
@@ -2252,6 +2254,32 @@ function cashAudit(C){const L=S.cashLocal;
   return h("div",null,h("details",null,h("summary",null,"출납부 미반영 기안 "+missing.length+"건"),missing.map(r=>h("div",null,r.no+" · "+r.title+" · "+cashNum(r.amt).toLocaleString()+"원"))),
     h("details",null,h("summary",null,"금액 차이 "+diff.length+"건"),diff.map(r=>h("div",null,r.no+" · 기안 총액 "+cashNum(r.amt).toLocaleString()+"원 · 출납부 합계 "+L.sums[r.no].toLocaleString()+"원 · 차이(출납부−기안) "+(L.sums[r.no]-cashNum(r.amt)).toLocaleString()+"원"))));
 }
+const cashNorm=v=>String(v??"").replace(/[\s_>\-]/g,"");
+const cashOccupied=(v,f)=>!!f||String(v??"").trim()!=="";
+function cashBudget(detail){
+  const line=String(detail||"").split(/\r?\n/).find(s=>/모금회\s*예산과목/.test(s));
+  const m=line&&/모금회\s*예산과목\s*[:：]?\s*\(목\)\s*(.*?)\s*\(세목\)\s*(.*?)\s*\(세세목\)\s*(.*?)\s*$/.exec(line);
+  return m?{H:m[1].trim(),I:m[2].trim(),J:m[3].trim()}:{};
+}
+function cashRowValues(source,no,r,rows,spell){
+  const cells={},kinds={},put=(c,v,k)=>{if(v&&!cashOccupied(source.cells[c],source.formulas?.[c])){cells[c]=v;kinds[c]=k}};
+  put("G",no,"sure");put("F",apprTitle(r?.title),"sure");
+  for(const [c,v] of Object.entries(cashBudget(r?.detail))){const known=(spell[c]||[]).find(t=>cashNorm(t)===cashNorm(v));put(c,known||v,known?"sure":"guess")}
+  const nz=v=>String(v??"").replace(/\s/g,""),peers=rows.filter(x=>x.row!==source.row&&nz(x.cells.G)===nz(no)),peer=c=>peers.find(x=>x.cells[c])?.cells[c];
+  put("K",peer("K")||({"카드전표":"인출","지급증":"송금","기타":"송금","(세금)계산서":"송금"})[source.cells.C],"guess");
+  put("L",peer("L")||"관련 기안","guess");return {row:source.row,cells,kinds};
+}
+function cashEntries(){
+  const rows=S.cashRowsAll||[],eligible=(S.appr?.rows||[]).filter(r=>r.mine!==false||S.apprUse.includes(r.no)),entries=[];
+  for(const group of S.cash?.groups||[]){const no=cashMatch(group).no,r=eligible.find(r=>r.no===no);if(!no||!r)continue;
+    for(const rn of group.rows){const source=rows.find(x=>x.row===rn);if(source)entries.push(cashRowValues(source,no,r,rows,S.cashSpell||{}))}}
+  return entries.filter(e=>Object.keys(e.cells).length);
+}
+function cashPreview(){
+  if(!S.cashBuf)return null;
+  const items=cashEntries().flatMap(e=>Object.entries(e.cells).sort(([a],[b])=>a.localeCompare(b)).map(([col,value])=>({row:e.row,col,value,kind:e.kinds[col]}))),sure=items.filter(x=>x.kind==="sure").length;
+  return h("details",null,h("summary",null,"채울 칸 "+items.length+"개 (기안 근거 "+sure+" · 추정 "+(items.length-sure)+")"),items.map(x=>h("div",null,x.row+"행 · "+x.col+" · "+x.value+" · "+(x.kind==="sure"?"기안 근거":"추정"))));
+}
 function cashCard(){
   const C=S.cash,groups=C?.groups||[],levels=groups.map(x=>cashMatch(x).level),filters=[["all","전체"],["sure","번호 확실"],["candidate","번호 후보"],["none","지결 필요"]];
   const visible=groups.filter((x,i)=>S.cashFilter==="all"||levels[i]===S.cashFilter),sel=groups.filter(x=>cashSelected(x)&&!cashHas(x));
@@ -2268,6 +2296,7 @@ function cashCard(){
       h("td",null,expCheck(expSource("cash",x))),h("td",null,fmtMD(x.from)+(x.to!==x.from?"~"+fmtMD(x.to):"")),
       h("td",{title:x.memo},p?h("span",{class:"faint",title:p},"… "):null,p?x.memo.slice(p.length):x.memo,cashHas(x)?h("span",{class:"pill green"},"할 일 있음"):null),
       h("td",null,x.vendors.join(", ")),h("td",{class:"num"},x.sum.toLocaleString()),h("td",null,cashNumber(x)))})))):null,
+    C?cashPreview():null,
     C?cashAudit(C):null);
 }
 function loadCashZip(){return window.JSZip?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=ok;s.onerror=()=>no(new Error("사본 생성 도구를 불러오지 못했습니다"));document.head.append(s)})}
@@ -2282,34 +2311,40 @@ async function cashPatch(buf,sheetName,entries){
   const parts=(rel.getAttribute("Target").startsWith("/")?rel.getAttribute("Target").slice(1):"xl/"+rel.getAttribute("Target")).split("/"),path=[];
   for(const p of parts){if(p==="..")path.pop();else if(p&&p!==".")path.push(p)}const target=path.join("/");
   const doc=await read(target),styles=await read("xl/styles.xml"),fills=all(styles,"fills")[0],xfs=all(styles,"cellXfs")[0];if(!fills||!xfs)throw Error("셀 서식 없음");
-  const make=(d,n)=>d.createElementNS(ns,n),fillId=child(fills,"fill").length,fill=make(styles,"fill"),pattern=make(styles,"patternFill");pattern.setAttribute("patternType","solid");
-  for(const [n,a,v] of [["fgColor","rgb","FFFFFF00"],["bgColor","indexed","64"]]){const e=make(styles,n);e.setAttribute(a,v);pattern.appendChild(e)}fill.appendChild(pattern);fills.appendChild(fill);fills.setAttribute("count",child(fills,"fill").length);
-  const styleMap=new Map(),baseStyles=child(xfs,"xf"),highlight=base=>{base=Number(base)||0;if(!styleMap.has(base)){if(!baseStyles[base])throw Error("기존 셀 서식 오류");const xf=baseStyles[base].cloneNode(true);xf.setAttribute("fillId",fillId);xf.setAttribute("applyFill","1");const i=child(xfs,"xf").length;xfs.appendChild(xf);styleMap.set(base,i)}return styleMap.get(base)};
-  const data=all(doc,"sheetData")[0];if(!data)throw Error("시트 데이터 없음");let count=0,skipped=0;const seen=new Set();
+  const make=(d,n)=>d.createElementNS(ns,n),fonts=all(styles,"fonts")[0],fillIds={};if(!fonts)throw Error("서식 오류");
+  for(const [kind,rgb] of [["sure","FFC6EFCE"],["guess","FFFFFF00"]]){const fill=make(styles,"fill"),pattern=make(styles,"patternFill");fillIds[kind]=child(fills,"fill").length;pattern.setAttribute("patternType","solid");
+    for(const [n,a,v] of [["fgColor","rgb",rgb],["bgColor","indexed","64"]]){const e=make(styles,n);e.setAttribute(a,v);pattern.appendChild(e)}fill.appendChild(pattern);fills.appendChild(fill)}fills.setAttribute("count",child(fills,"fill").length);
+  const styleMap=new Map(),fontMap=new Map(),baseStyles=child(xfs,"xf"),baseFonts=child(fonts,"font"),highlight=(base,kind)=>{base=Number(base)||0;const key=base+":"+kind;
+    if(!styleMap.has(key)){if(!baseStyles[base])throw Error("기존 셀 서식 오류");const xf=baseStyles[base].cloneNode(true),fb=Number(xf.getAttribute("fontId"))||0;
+      if(!fontMap.has(fb)){if(!baseFonts[fb])throw Error("기존 글꼴 오류");const font=baseFonts[fb].cloneNode(true);for(const c of child(font,"color"))font.removeChild(c);const color=make(styles,"color");color.setAttribute("rgb","FF0000FF");font.appendChild(color);fontMap.set(fb,child(fonts,"font").length);fonts.appendChild(font)}
+      xf.setAttribute("fontId",fontMap.get(fb));xf.setAttribute("fillId",fillIds[kind]);xf.setAttribute("applyFill","1");xf.setAttribute("applyFont","1");const i=child(xfs,"xf").length;xfs.appendChild(xf);styleMap.set(key,i)}return styleMap.get(key)};
+  const data=all(doc,"sheetData")[0];if(!data)throw Error("시트 데이터 없음");let count=0,skipped=0;const seen=new Set(),byCol={};
+  const colNumber=c=>Array.from(c).reduce((n,ch)=>n*26+ch.charCodeAt(0)-64,0);
   let strings=null;
-  for(const item of entries){for(const rn of item.rows){if(!Number.isInteger(rn)||rn<5)throw Error("출납부 행 번호 오류");if(seen.has(rn))continue;seen.add(rn);
+  for(const item of entries){const rn=item.row;for(const [column,value] of Object.entries(item.cells).sort(([a],[b])=>colNumber(a)-colNumber(b))){
+    if(!/^[F-L]$/.test(column))throw Error("허용되지 않은 열");if(value==null||String(value).trim()==="")continue;const kind=item.kinds?.[column];if(kind!=="sure"&&kind!=="guess")throw Error("근거 구분 오류");if(!Number.isInteger(rn)||rn<5)throw Error("출납부 행 번호 오류");if(seen.has(column+rn))continue;seen.add(column+rn);
     let row=child(data,"row").find(e=>Number(e.getAttribute("r"))===rn);if(!row)throw Error("원본에 없는 출납부 행: "+rn);
-    let cell=child(row,"c").find(e=>e.getAttribute("r")==="G"+rn);
+    let cell=child(row,"c").find(e=>e.getAttribute("r")===column+rn);
     if(cell){const type=cell.getAttribute("t"),vs=all(cell,"v"),txt=all(cell,"t").map(e=>e.textContent).join("");let value=vs.map(e=>e.textContent).join("");
       if(type==="s"&&value!==""){if(!strings)strings=all(await read("xl/sharedStrings.xml"),"si");value=strings[Number(value)]?.textContent??"?"}
       if(all(cell,"f").length||String(value).trim()||txt.trim()){skipped++;continue}}
-    else{cell=make(doc,"c");cell.setAttribute("r","G"+rn);const next=child(row,"c").find(e=>{const col=e.getAttribute("r").match(/^[A-Z]+/)?.[0]||"";return col.length>1||col>"G"});row.insertBefore(cell,next||null)}
-    const col=all(doc,"col").find(c=>Number(c.getAttribute("min"))<=7&&Number(c.getAttribute("max"))>=7);
+    else{cell=make(doc,"c");cell.setAttribute("r",column+rn);const next=child(row,"c").find(e=>{const col=e.getAttribute("r").match(/^[A-Z]+/)?.[0]||"";return colNumber(col)>colNumber(column)});row.insertBefore(cell,next||null)}
+    const col=all(doc,"col").find(c=>Number(c.getAttribute("min"))<=colNumber(column)&&Number(c.getAttribute("max"))>=colNumber(column));
     const base=cell.hasAttribute("s")?cell.getAttribute("s"):row.getAttribute("customFormat")==="1"?row.getAttribute("s"):col?.getAttribute("style");
-    cell.setAttribute("s",highlight(base));cell.setAttribute("t","inlineStr");while(cell.firstChild)cell.removeChild(cell.firstChild);
-    const is=make(doc,"is"),t=make(doc,"t");t.textContent=item.no;is.appendChild(t);cell.appendChild(is);count++;
+    cell.setAttribute("s",highlight(base,kind));cell.setAttribute("t","inlineStr");while(cell.firstChild)cell.removeChild(cell.firstChild);
+    const is=make(doc,"is"),t=make(doc,"t");t.setAttributeNS("http://www.w3.org/XML/1998/namespace","xml:space","preserve");t.textContent=String(value);is.appendChild(t);cell.appendChild(is);count++;byCol[column]=(byCol[column]||0)+1;
   }}
-  xfs.setAttribute("count",child(xfs,"xf").length);if(count){zip.file(target,serialize(doc));zip.file("xl/styles.xml",serialize(styles))}
-  return {bytes:await zip.generateAsync({type:"uint8array",compression:"DEFLATE"}),count,skipped};
+  fonts.setAttribute("count",child(fonts,"font").length);xfs.setAttribute("count",child(xfs,"xf").length);if(count){zip.file(target,serialize(doc));zip.file("xl/styles.xml",serialize(styles))}
+  return {bytes:await zip.generateAsync({type:"uint8array",compression:"DEFLATE"}),count,skipped,byCol};
 }
 async function cashDownload(){
   if(!S.cashBuf)return toast("출납부를 다시 불러와 주세요","bad");
   if(!/\.xlsx$/i.test(S.cashFile||""))return toast("서식을 보존하려면 xlsx 출납부를 불러와 주세요","bad");
   if(!S.cashLocal||S.cashLocal.at!==S.cash?.at||S.cashLocal.file!==S.cash?.file)return toast("출납부를 다시 불러와 주세요","bad");
-  const entries=S.cash.groups.map(x=>({rows:x.rows,no:cashMatch(x).no})).filter(x=>x.no);if(!entries.length)return toast("기입할 번호를 먼저 선택해 주세요","bad");
+  const entries=cashEntries();if(!entries.length)return toast("기입할 번호를 먼저 선택해 주세요","bad");
   try{await loadCashZip();const result=await cashPatch(S.cashBuf,S.cashSheet,entries),url=URL.createObjectURL(new Blob([result.bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})),a=document.createElement("a"),now=new Date();
     a.href=url;a.download=S.cashFile.replace(/\.xlsx$/i,"")+"_번호기입_"+String(now.getMonth()+1).padStart(2,"0")+String(now.getDate()).padStart(2,"0")+".xlsx";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-    toast(result.count+"줄에 번호를 채운 사본을 내려받았습니다(원본은 그대로)"+(result.skipped?" · 기존 값 "+result.skipped+"줄 건너뜀":""));
+    toast(result.count+"칸을 채운 사본을 내려받았습니다 · 초록=기안 근거, 노랑=추정(확인 필요) · 원본은 그대로");
   }catch(e){toast("사본 생성 실패 · "+e.message,"bad")}
 }
 
