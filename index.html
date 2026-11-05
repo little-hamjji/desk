@@ -2088,7 +2088,7 @@ function hkStatus(){(async()=>{
   const rows=all.filter(tr=>{if([...tr.querySelectorAll("td")].some(td=>td.innerText.trim()==="기안중")){skipped++;return false}return true}).slice(0,MAX),out=[];
   for(let i=0;i<rows.length;i++){try{const tr=rows[i];say(`결재 단계 확인 중… ${i+1}/${rows.length}\n(결재가 끝난 문서는 다음부터 열지 않아 빨라집니다)`,1);
     const c=[...tr.querySelectorAll("td")].map(td=>td.innerText.trim().replace(/\s+/g," "));const no=(tr.innerText.match(/\d{4}\/\d{2}\/\d{2}-\d+/)||[""])[0];
-    const col=name=>{for(const head of tr.closest("table").querySelectorAll("thead tr")){const cell=[...head.cells].find(td=>td.innerText.trim()===name);if(cell)return cell.cellIndex}return -1};
+    const col=name=>{const t=tr.closest("table");for(const head of [...(t?t.querySelectorAll("thead tr"):[]),...document.querySelectorAll("thead tr")]){if(!head.offsetParent)continue;const cell=[...head.cells].find(td=>td.innerText.trim().replace(/s+/g,"")===name);if(cell)return cell.cellIndex}return -1};
     const cells=[...tr.querySelectorAll("td")],di=col("기안자"),ti=col("제목"),drafter=di>=0?(c[di]||""):(c.includes(ME)?ME:""),mine=di>=0?drafter===ME:c.includes(ME);
     const big=ti>=0?cells[ti].cloneNode(true):[...tr.querySelectorAll("td")].sort((x,y)=>y.innerText.length-x.innerText.length)[0].cloneNode(true);const label=[...big.querySelectorAll(".label")].map(x=>x.innerText.trim()).filter(Boolean).join(" ");big.querySelectorAll(".label").forEach(x=>x.remove());
     const title=big.innerText.trim().replace(/\s+/g," "),st=(c.find(x=>/^(기안중|진행중|반려|완료|결재완료|결재|회수|보류)$/.test(x))||"").trim();
