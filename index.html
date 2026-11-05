@@ -2430,11 +2430,11 @@ const SYNC={
 async function syncOut(k){
   const c=SYNC[k],L=c.local();c.busy=true;
   try{
-    const have=new Map(S.data[c.rows].map(x=>[x[c.id],x])),jobs=[];
+    const have=new Map(),dup=[],jobs=[];S.data[c.rows].forEach(x=>{if(have.has(x[c.id]))dup.push(x);else have.set(x[c.id],x)}); // 노션에 같은 번호가 여러 줄이면 하나만 남김
     c.list(L).map(c.out).forEach(f=>{const o=have.get(f[c.id]);have.delete(f[c.id]);
       if(!o)jobs.push(()=>api("add",{kind:k,fields:f}));
       else if(Object.keys(f).some(n=>String(f[n]??"")!==String(o[n]??"")))jobs.push(()=>api("update",{kind:k,id:o.id,fields:f}))});
-    if(!c.noTrash)have.forEach(o=>jobs.push(()=>api("trash",{kind:k,id:o.id})));
+    if(!c.noTrash)[...have.values(),...dup].forEach(o=>jobs.push(()=>api("trash",{kind:k,id:o.id})));
     for(let i=0;i<jobs.length;i+=3)await Promise.all(jobs.slice(i,i+3).map(j=>j()));
     await api("syncMark",{kind:k,meta:c.meta(L)});
     c.busy=false;refresh(true);
